@@ -1,0 +1,408 @@
+// Copyright 2022 Alexandre Dutra
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package goalesce
+
+import (
+	"errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"reflect"
+	"testing"
+)
+
+func TestNewStructCoalescer(t *testing.T) {
+	t.Run("no opts", func(t *testing.T) {
+		got := NewStructCoalescer()
+		assert.Equal(
+			t,
+			&structCoalescer{
+				fallback: &defaultCoalescer{},
+			},
+			got,
+		)
+	})
+	t.Run("with field coalescer", func(t *testing.T) {
+		type foo struct {
+			Int int
+		}
+		got := NewStructCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "Int", &defaultCoalescer{}))
+		assert.Equal(
+			t,
+			&structCoalescer{
+				fallback: &defaultCoalescer{},
+				fieldCoalescers: map[reflect.Type]map[string]Coalescer{
+					reflect.TypeOf(foo{}): {
+						"Int": &defaultCoalescer{},
+					},
+				},
+			},
+			got)
+	})
+}
+
+func Test_structCoalescer_Coalesce(t *testing.T) {
+	t.Run("basic", func(t *testing.T) {
+		type foo struct {
+			Int int
+		}
+		type bar struct {
+			Int        int
+			Foo        foo
+			IntPtr     *int
+			BarPtr     *bar
+			unexported int
+			Interface  interface{}
+			Map        map[int]string
+			MapReplace map[int]string `coalesceStrategy:"replace"`
+		}
+		tests := []struct {
+			name string
+			v1   bar
+			v2   bar
+			want bar
+		}{
+			{
+				"zeroes",
+				bar{},
+				bar{},
+				bar{},
+			},
+			{
+				"non zeroes int",
+				bar{Int: 1},
+				bar{Int: 2},
+				bar{Int: 2},
+			},
+			{
+				"non zeroes bar",
+				bar{Foo: foo{Int: 1}},
+				bar{Foo: foo{Int: 2}},
+				bar{Foo: foo{Int: 2}},
+			},
+			{
+				"mixed zeroes intptr1",
+				bar{IntPtr: intPtr(1)},
+				bar{IntPtr: nil},
+				bar{IntPtr: intPtr(1)},
+			},
+			{
+				"mixed zeroes intptr2",
+				bar{IntPtr: nil},
+				bar{IntPtr: intPtr(2)},
+				bar{IntPtr: intPtr(2)},
+			},
+			{
+				"mixed zeroes barptr1",
+				bar{BarPtr: &bar{Int: 1}},
+				bar{BarPtr: nil},
+				bar{BarPtr: &bar{Int: 1}},
+			},
+			{
+				"mixed zeroes barptr 2",
+				bar{BarPtr: nil},
+				bar{BarPtr: &bar{Int: 2}},
+				bar{BarPtr: &bar{Int: 2}},
+			},
+			{
+				"non zeroes intptr",
+				bar{IntPtr: intPtr(1)},
+				bar{IntPtr: intPtr(2)},
+				bar{IntPtr: intPtr(2)},
+			},
+			{
+				"non zeroes barptr",
+				bar{BarPtr: &bar{Int: 1}},
+				bar{BarPtr: &bar{Int: 2}},
+				bar{BarPtr: &bar{Int: 2}},
+			},
+			{
+				"non zeroes unexported",
+				bar{unexported: 1},
+				bar{unexported: 2},
+				bar{},
+			},
+			{
+				"field interface",
+				bar{Interface: 1},
+				bar{Interface: "abc"},
+				bar{Interface: "abc"},
+			},
+			{
+				"field map",
+				bar{Map: map[int]string{1: "a", 2: "b"}},
+				bar{Map: map[int]string{2: "a", 3: "b"}},
+				bar{Map: map[int]string{1: "a", 2: "a", 3: "b"}},
+			},
+			{
+				"field map replace",
+				bar{MapReplace: map[int]string{1: "a", 2: "b"}},
+				bar{MapReplace: map[int]string{2: "a", 3: "b"}},
+				bar{MapReplace: map[int]string{2: "a", 3: "b"}},
+			},
+			{
+				"non zeroes unexported",
+				bar{unexported: 1},
+				bar{unexported: 2},
+				bar{},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				coalescer := NewStructCoalescer()
+				coalescer.WithFallback(NewMainCoalescer())
+				got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+				assert.Equal(t, tt.want, got.Interface())
+				require.NoError(t, err)
+			})
+		}
+	})
+	t.Run("slice fields", func(t *testing.T) {
+		type foo struct {
+			Int    int
+			IntPtr *int
+		}
+		type nested struct {
+			Key    int
+			NonKey string
+			Ints   []int
+		}
+		type bar struct {
+			Ints            []int
+			IntsReplace     []int `coalesceStrategy:"replace"`
+			IntsUnion       []int `coalesceStrategy:"union"`
+			IntsAppend      []int `coalesceStrategy:"append"`
+			Foos            []foo
+			FoosReplace     []foo    `coalesceStrategy:"replace"`
+			FoosUnion       []foo    `coalesceStrategy:"union"`
+			FoosAppend      []foo    `coalesceStrategy:"append"`
+			FoosMergeKey    []foo    `coalesceStrategy:"merge" coalesceMergeKey:"Int"`
+			FooPtrsMergeKey []*foo   `coalesceStrategy:"merge" coalesceMergeKey:"IntPtr"`
+			NestedSlice     []nested `coalesceStrategy:"merge" coalesceMergeKey:"Key"`
+		}
+		tests := []struct {
+			name string
+			v1   bar
+			v2   bar
+			want bar
+		}{
+			{
+				"slice ints default",
+				bar{Ints: []int{1, 2}},
+				bar{Ints: []int{2, 3}},
+				bar{Ints: []int{2, 3}},
+			},
+			{
+				"slice ints replace",
+				bar{IntsReplace: []int{1, 2}},
+				bar{IntsReplace: []int{2, 3}},
+				bar{IntsReplace: []int{2, 3}},
+			},
+			{
+				"slice ints union",
+				bar{IntsUnion: []int{1, 2}},
+				bar{IntsUnion: []int{2, 3}},
+				bar{IntsUnion: []int{1, 2, 3}},
+			},
+			{
+				"slice ints append",
+				bar{IntsUnion: []int{1, 2}},
+				bar{IntsUnion: []int{2, 3}},
+				bar{IntsUnion: []int{1, 2, 2, 3}},
+			},
+			{
+				"slice foos default",
+				bar{Foos: []foo{{Int: 1}, {Int: 2}}},
+				bar{Foos: []foo{{Int: 2}, {Int: 3}}},
+				bar{Foos: []foo{{Int: 2}, {Int: 3}}},
+			},
+			{
+				"slice foos replace",
+				bar{FoosReplace: []foo{{Int: 1}, {Int: 2}}},
+				bar{FoosReplace: []foo{{Int: 2}, {Int: 3}}},
+				bar{FoosReplace: []foo{{Int: 2}, {Int: 3}}},
+			},
+			{
+				"slice foos union",
+				bar{FoosUnion: []foo{{Int: 1}, {Int: 2}}},
+				bar{FoosUnion: []foo{{Int: 2}, {Int: 3}}},
+				bar{FoosUnion: []foo{{Int: 1}, {Int: 2}, {Int: 3}}},
+			},
+			{
+				"slice foos append",
+				bar{FoosAppend: []foo{{Int: 1}, {Int: 2}}},
+				bar{FoosAppend: []foo{{Int: 2}, {Int: 3}}},
+				bar{FoosAppend: []foo{{Int: 1}, {Int: 2}, {Int: 2}, {Int: 3}}},
+			},
+			{
+				"slice foos merge key",
+				bar{FoosMergeKey: []foo{{Int: 1}, {Int: 2}}},
+				bar{FoosMergeKey: []foo{{Int: 2}, {Int: 3}}},
+				bar{FoosMergeKey: []foo{{Int: 1}, {Int: 2}, {Int: 3}}},
+			},
+			{
+				"slice foo ptrs merge key",
+				bar{FooPtrsMergeKey: []*foo{{IntPtr: intPtr(1)}, {IntPtr: intPtr(2)}}},
+				bar{FooPtrsMergeKey: []*foo{{IntPtr: intPtr(2)}, {IntPtr: intPtr(3)}}},
+				bar{FooPtrsMergeKey: []*foo{{IntPtr: intPtr(1)}, {IntPtr: intPtr(2)}, {IntPtr: intPtr(3)}}},
+			},
+			{
+				"nested slice",
+				bar{NestedSlice: []nested{{Key: 1, NonKey: "abc", Ints: []int{1, 2}}}},
+				bar{NestedSlice: []nested{{Key: 1, NonKey: "def", Ints: []int{2, 3}}}},
+				bar{NestedSlice: []nested{{Key: 1, NonKey: "def", Ints: []int{2, 3}}}},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				coalescer := NewStructCoalescer()
+				coalescer.WithFallback(NewMainCoalescer())
+				got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+				require.NoError(t, err)
+				assert.ElementsMatch(t, tt.want.Ints, got.Interface().(bar).Ints)
+				assert.ElementsMatch(t, tt.want.IntsReplace, got.Interface().(bar).IntsReplace)
+				assert.ElementsMatch(t, tt.want.Foos, got.Interface().(bar).Foos)
+				assert.ElementsMatch(t, tt.want.FoosReplace, got.Interface().(bar).FoosReplace)
+				assert.ElementsMatch(t, tt.want.FoosUnion, got.Interface().(bar).FoosUnion)
+				assert.ElementsMatch(t, tt.want.FoosMergeKey, got.Interface().(bar).FoosMergeKey)
+				assert.ElementsMatch(t, tt.want.FooPtrsMergeKey, got.Interface().(bar).FooPtrsMergeKey)
+			})
+		}
+	})
+	t.Run("options", func(t *testing.T) {
+		t.Run("field coalescer", func(t *testing.T) {
+			type foo struct {
+				Ints []int
+			}
+			coalescer := NewStructCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "Ints", &sliceAppendCoalescer{}))
+			got, err := coalescer.Coalesce(reflect.ValueOf(foo{Ints: []int{1, 2}}), reflect.ValueOf(foo{Ints: []int{2, 3}}))
+			require.NoError(t, err)
+			assert.Equal(t, foo{Ints: []int{1, 2, 2, 3}}, got.Interface())
+		})
+	})
+	t.Run("tag errors", func(t *testing.T) {
+		type foo struct {
+			Int int
+		}
+		type unknownStrategy struct {
+			Ints []int `coalesceStrategy:"unknown"`
+		}
+		type invalidAppend struct {
+			Int int `coalesceStrategy:"append"`
+		}
+		type invalidUnion struct {
+			Int int `coalesceStrategy:"union"`
+		}
+		type invalidMerge struct {
+			Int int `coalesceStrategy:"merge"`
+		}
+		type missingKey struct {
+			Ints []int `coalesceStrategy:"merge"`
+		}
+		type wrongElemType struct {
+			Ints []int `coalesceStrategy:"merge" coalesceMergeKey:"irrelevant"`
+		}
+		type unknownField struct {
+			Foos    []foo  `coalesceStrategy:"merge" coalesceMergeKey:"unknown"`
+			FooPtrs []*foo `coalesceStrategy:"merge" coalesceMergeKey:"unknown"`
+		}
+		tests := []struct {
+			name string
+			v1   interface{}
+			v2   interface{}
+			want string
+		}{
+			{
+				"unknown strategy",
+				unknownStrategy{Ints: []int{1, 2}},
+				unknownStrategy{Ints: []int{2, 3}},
+				"field goalesce.unknownStrategy.Ints: unknown coalesce strategy: unknown",
+			},
+			{
+				"invalid append",
+				invalidAppend{Int: 1},
+				invalidAppend{Int: 2},
+				"field goalesce.invalidAppend.Int: append strategy is only supported for slices",
+			},
+			{
+				"invalid union",
+				invalidUnion{Int: 1},
+				invalidUnion{Int: 2},
+				"field goalesce.invalidUnion.Int: union strategy is only supported for slices",
+			},
+			{
+				"invalid merge",
+				invalidMerge{Int: 1},
+				invalidMerge{Int: 2},
+				"field goalesce.invalidMerge.Int: merge strategy is only supported for slices",
+			},
+			{
+				"missing merge key",
+				missingKey{Ints: []int{1}},
+				missingKey{Ints: []int{2}},
+				"field goalesce.missingKey.Ints: coalesceMergeKey struct tag is required for merge strategy",
+			},
+			{
+				"wrong element type",
+				wrongElemType{Ints: []int{1}},
+				wrongElemType{Ints: []int{2}},
+				"field goalesce.wrongElemType.Ints: expecting slice of struct or pointer thereto, got: []int",
+			},
+			{
+				"unknown field",
+				unknownField{Foos: []foo{{Int: 1}}},
+				unknownField{Foos: []foo{{Int: 2}}},
+				"field goalesce.unknownField.Foos: slice element type goalesce.foo has no field named unknown",
+			},
+			{
+				"unknown field ptr",
+				unknownField{FooPtrs: []*foo{{Int: 1}}},
+				unknownField{FooPtrs: []*foo{{Int: 2}}},
+				"field goalesce.unknownField.Foos: slice element type goalesce.foo has no field named unknown",
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				coalescer := NewStructCoalescer()
+				_, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+				assert.EqualError(t, err, tt.want)
+			})
+		}
+	})
+	t.Run("type errors", func(t *testing.T) {
+		type foo struct {
+			Int int
+		}
+		type bar struct {
+			Int int
+		}
+		_, err := NewStructCoalescer().Coalesce(reflect.ValueOf(foo{}), reflect.ValueOf(bar{}))
+		assert.EqualError(t, err, "types do not match: goalesce.foo != goalesce.bar")
+		_, err = NewStructCoalescer().Coalesce(reflect.ValueOf(1), reflect.ValueOf(2))
+		assert.EqualError(t, err, "values have wrong kind: expected struct, got int")
+	})
+	t.Run("fallback error", func(t *testing.T) {
+		type foo struct {
+			Int int
+		}
+		m := new(mockCoalescer)
+		m.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.Value{}, errors.New("fake"))
+		m.Test(t)
+		coalescer := NewStructCoalescer()
+		coalescer.WithFallback(m)
+		_, err := coalescer.Coalesce(reflect.ValueOf(foo{Int: 1}), reflect.ValueOf(foo{Int: 2}))
+		assert.EqualError(t, err, "fake")
+	})
+}

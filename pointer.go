@@ -56,20 +56,20 @@ func (c *pointerCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error)
 	if err := checkTypesMatchWithKind(v1, v2, reflect.Ptr); err != nil {
 		return reflect.Value{}, err
 	}
-	if value, done := checkZero(v1, v2); done {
-		return value, nil
-	}
 	if c.checkCycle(v1) {
 		if c.onCycleReturnError {
 			return reflect.Value{}, fmt.Errorf("%s: cycle detected", v1.Type().String())
 		}
-		v1 = reflect.New(v1.Type().Elem())
+		v1 = reflect.Zero(v1.Type())
 	}
 	if c.checkCycle(v2) {
 		if c.onCycleReturnError {
 			return reflect.Value{}, fmt.Errorf("%s: cycle detected", v2.Type().String())
 		}
-		v2 = reflect.New(v2.Type().Elem())
+		v2 = reflect.Zero(v2.Type())
+	}
+	if value, done := checkZero(v1, v2); done {
+		return value, nil
 	}
 	coalesced := reflect.New(v1.Elem().Type())
 	coalescedTarget, err := c.fallback.Coalesce(v1.Elem(), v2.Elem())

@@ -118,19 +118,19 @@ func Test_pointerCoalescer_Coalesce(t *testing.T) {
 			"cycle 3",
 			simpleCycle(),
 			simpleCycle(),
-			&cycle{Cycle: &cycle{Cycle: &cycle{}}},
+			&cycle{Cycle: &cycle{}},
 		},
 		{
 			"cycle 4",
-			&cycle{Cycle: &cycle{}},
+			&cycle{Cycle: &cycle{Cycle: &cycle{}}},
 			simpleCycle(),
-			simpleCycle(), // unnoticed
+			&cycle{Cycle: &cycle{Cycle: &cycle{}}},
 		},
 		{
 			"cycle 5",
 			simpleCycle(),
-			&cycle{Cycle: &cycle{}},
-			simpleCycle(), // unnoticed
+			&cycle{Cycle: &cycle{Cycle: &cycle{}}},
+			&cycle{Cycle: &cycle{Cycle: &cycle{}}},
 		},
 		{
 			"cycle 6",
@@ -148,7 +148,7 @@ func Test_pointerCoalescer_Coalesce(t *testing.T) {
 			"cycle 8",
 			complexCycle(),
 			complexCycle(),
-			&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}}},
+			&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}},
 		},
 		{
 			"cycle 9",

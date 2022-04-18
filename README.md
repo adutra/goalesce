@@ -70,7 +70,7 @@ the values.
 ```go
 v1 := map[int]string{1: "a", 2: "b"}
 v2 := map[int]string{2: "c", 3: "d"}
-coalesced, _ = goalesce.Coalesce(v1, v2)
+coalesced, _ := goalesce.Coalesce(v1, v2)
 fmt.Printf("Coalesce(%v, %v) = %v\n", v1, v2, coalesced)
 ```
 
@@ -126,7 +126,25 @@ Output:
 
     Coalesce([1 2], [2 3], SetUnion) = [1 2 3]
 
-When the slice elements are pointers, this strategy dereferences the pointers and compare their targets.
+When the slice elements are pointers, this strategy dereferences the pointers and compare their targets. If the 
+resulting value is nil, the zero-value is used instead. _This means that two nil pointers are considered equal, and 
+equal to a non-nil pointer to the zero-value_:
+
+```go
+intPtr := func(i int) *int { return &i }
+v1 := []*int{new(int), intPtr(0)} // new(int) and intPtr(0) are equal and point both to the zero-value (0)
+v2 := []*int{nil, intPtr(1)}      // nil will be coalesced as the zero-value (0)
+sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultSetUnion())
+coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+for i, elem := range coalesced.([]*int) {
+    fmt.Printf("%v: %T %+v\n", i, elem, *elem)
+}
+```
+
+Output:
+
+    0: *int 0
+    1: *int 1
 
 This strategy is fine for slices of scalars and pointers thereof, but it is not recommended for slices of complex 
 types as the elements may not be fully comparable.
@@ -220,7 +238,7 @@ v1 := []*User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
 v2 := []*User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
 coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
 jsn, _ := json.MarshalIndent(coalesced, "", "  ")
-println(string(jsn))
+fmt.Println(string(jsn))
 ```
 
 Output:
@@ -267,7 +285,7 @@ When the default struct coalescing behavior is not desired or sufficient, per-fi
 
 The struct tag `coalesceStrategy` allows to specify the following per-field strategies:
 
-| Strategy  | Valid on               | effect                              |
+| Strategy  | Valid on               | Effect                              |
 |-----------|------------------------|-------------------------------------|
 | `replace` | Any field              | Applies "replace" semantics.        |
 | `union`   | Slice fields           | Applies "set-union" semantics.      |
@@ -319,7 +337,7 @@ v2 = Movie{
 }
 coalesced, _ = goalesce.Coalesce(v1, v2)
 jsn, _ := json.MarshalIndent(coalesced, "", "  ")
-println(string(jsn))
+fmt.Println(string(jsn))
 ```
 
 Output:

@@ -33,7 +33,9 @@ func NewSliceCoalescer(opts ...SliceCoalescerOption) Coalescer {
 	return sc
 }
 
-// WithDefaultSetUnion applies set-union semantics to all slices to be coalesced.
+// WithDefaultSetUnion applies set-union semantics to all slices to be coalesced. When the slice elements are pointers,
+// this strategy dereferences the pointers and compare their targets. This strategy is fine for slices of scalars and
+// pointers thereof, but it is not recommended for slices of complex types as the elements may not be fully comparable.
 func WithDefaultSetUnion() SliceCoalescerOption {
 	return func(c *sliceCoalescer) {
 		c.defaultCoalescer = &sliceMergeCoalescer{
@@ -49,8 +51,10 @@ func WithDefaultListAppend() SliceCoalescerOption {
 	}
 }
 
-// WithSetUnion applies set-union semantics to the given slice element type. If the slice element type is a pointer
-// type, the passed argument must be that pointer type, not its target type.
+// WithSetUnion applies set-union semantics to the given slice element type. When the slice elements are of a pointer
+// type, this strategy dereferences the pointers and compare their targets; also, the passed argument must be that
+// pointer type, not its target type. This strategy is fine for slices of scalars and pointers thereof, but it is not
+// recommended for slices of complex types as the elements may not be fully comparable.
 func WithSetUnion(elemType reflect.Type) SliceCoalescerOption {
 	return WithMergeByKey(elemType, SliceUnion)
 }

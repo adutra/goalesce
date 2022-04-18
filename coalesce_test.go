@@ -253,7 +253,7 @@ func TestCoalesce(t *testing.T) {
 					NewSliceCoalescer(
 						WithMergeByKey(
 							reflect.PtrTo(reflect.TypeOf(foo{})),
-							func(v reflect.Value) reflect.Value {
+							func(_ int, v reflect.Value) reflect.Value {
 								i := v.Interface()
 								return reflect.ValueOf(i.(*foo).Int)
 							},

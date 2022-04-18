@@ -51,6 +51,15 @@ func WithDefaultListAppend() SliceCoalescerOption {
 	}
 }
 
+// WithDefaultMergeByIndex applies merge-by-index semantics to all slices to be coalesced.
+func WithDefaultMergeByIndex() SliceCoalescerOption {
+	return func(c *sliceCoalescer) {
+		c.defaultCoalescer = &sliceMergeCoalescer{
+			mergeKeyFunc: SliceIndex,
+		}
+	}
+}
+
 // WithSetUnion applies set-union semantics to the given slice element type. When the slice elements are of a pointer
 // type, this strategy dereferences the pointers and compare their targets; also, the passed argument must be that
 // pointer type, not its target type. This strategy is fine for slices of scalars and pointers thereof, but it is not
@@ -70,7 +79,7 @@ func WithListAppend(elem reflect.Type) SliceCoalescerOption {
 	}
 }
 
-// WithMergeByField applies merge-by semantics to slices whose elements are of the passed struct type, or a pointer
+// WithMergeByField applies merge-by-key semantics to slices whose elements are of the passed struct type, or a pointer
 // thereto. The passed field name will be used to extract the element merge key; therefore, the field should generally
 // be a unique identifier or primary key for objects of this type.
 func WithMergeByField(structType reflect.Type, field string) SliceCoalescerOption {
@@ -81,7 +90,7 @@ func WithMergeByField(structType reflect.Type, field string) SliceCoalescerOptio
 	}
 }
 
-// WithMergeByKey applies merge-by semantics to the given slice element type. The given mergeKeyFunc will be used to
+// WithMergeByKey applies merge-by-key semantics to the given slice element type. The given mergeKeyFunc will be used to
 // extract the element merge key. If the slice element type is a pointer type, the passed type argument must be that
 // pointer type, not its target type.
 func WithMergeByKey(elemType reflect.Type, f SliceMergeKeyFunc) SliceCoalescerOption {
@@ -91,6 +100,20 @@ func WithMergeByKey(elemType reflect.Type, f SliceMergeKeyFunc) SliceCoalescerOp
 		}
 		c.elemCoalescers[elemType] = &sliceMergeCoalescer{
 			mergeKeyFunc: f,
+		}
+	}
+}
+
+// WithMergeByIndex applies merge-by-index semantics to the given slice element type. The given mergeKeyFunc will be
+// used to extract the element merge key. If the slice element type is a pointer type, the passed type argument must be
+// that pointer type, not its target type.
+func WithMergeByIndex(elemType reflect.Type) SliceCoalescerOption {
+	return func(c *sliceCoalescer) {
+		if c.elemCoalescers == nil {
+			c.elemCoalescers = make(map[reflect.Type]Coalescer)
+		}
+		c.elemCoalescers[elemType] = &sliceMergeCoalescer{
+			mergeKeyFunc: SliceIndex,
 		}
 	}
 }
@@ -143,24 +166,32 @@ func (c *sliceAppendCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, er
 
 func (c *sliceAppendCoalescer) WithFallback(Coalescer) {}
 
-// SliceMergeKeyFunc is a function that extracts a merge key from a slice element. The passed element may be the zero
-// value for the slice element type, but it will never be an invalid value. The returned merge key can be a zero value,
-// but cannot be invalid; moreover, it must be comparable as it will be stored internally in a temporary map during the
-// merge.
-type SliceMergeKeyFunc func(reflect.Value) reflect.Value
+// SliceMergeKeyFunc is a function that extracts a merge key from a slice element's index and value. The passed element
+// may be the zero value for the slice element type, but it will never be an invalid value. The returned merge key can
+// be a zero value, but cannot be invalid; moreover, it must be comparable as it will be stored internally in a
+// temporary map during the merge.
+type SliceMergeKeyFunc func(index int, element reflect.Value) (key reflect.Value)
 
 // SliceUnion is a merge key func that returns the elements themselves as keys, thus achieving set-union semantics. If
 // the elements are pointers, they are dereferenced, which means that the set-union semantics will apply to the pointer
 // targets, not to the pointers themselves. When using this func to do slice merges, the resulting slices will have no
 // duplicate items (that is, items having the same merge key).
-var SliceUnion SliceMergeKeyFunc = safeIndirect
+var SliceUnion SliceMergeKeyFunc = func(index int, element reflect.Value) (key reflect.Value) {
+	return safeIndirect(element)
+}
+
+// SliceIndex is a merge key func that returns the element indices as keys, thus achieving merge-by-index semantics.
+// When using this func to do slice merges, the resulting slices will have their elements coalesced index by index.
+var SliceIndex SliceMergeKeyFunc = func(index int, element reflect.Value) (key reflect.Value) {
+	return reflect.ValueOf(index)
+}
 
 // newMergeByField returns a SliceMergeKeyFunc that returns the value of the given struct field for each slice element.
 // This function is designed to work on slices of structs, and slices of pointers to structs. When this function
 // encounters a pointer while extracting the merge key, it dereferences the pointer; if the pointer was nil, a zero
 // value will be used instead, but beware that this may result in nondeterministic merge results.
 func newMergeByField(field string) SliceMergeKeyFunc {
-	return func(elem reflect.Value) reflect.Value {
+	return func(_ int, elem reflect.Value) reflect.Value {
 		// the slice element itself may be a pointer; we want to dereference it and return a zero value if it's nil.
 		elem = safeIndirect(elem)
 		// the slice element's field may also be a pointer; again, we want to dereference it and return a zero value
@@ -192,7 +223,7 @@ func (c *sliceMergeCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, err
 	m1 := reflect.MakeMap(reflect.MapOf(typeOfInterface, v1.Type().Elem()))
 	for i := 0; i < v1.Len(); i++ {
 		v := v1.Index(i)
-		k := c.mergeKeyFunc(v)
+		k := c.mergeKeyFunc(i, v)
 		if err := checkMergeKey(k); err != nil {
 			return reflect.Value{}, err
 		}
@@ -204,7 +235,7 @@ func (c *sliceMergeCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, err
 	m2 := reflect.MakeMap(reflect.MapOf(typeOfInterface, v2.Type().Elem()))
 	for i := 0; i < v2.Len(); i++ {
 		v := v2.Index(i)
-		k := c.mergeKeyFunc(v)
+		k := c.mergeKeyFunc(i, v)
 		if err := checkMergeKey(k); err != nil {
 			return reflect.Value{}, err
 		}

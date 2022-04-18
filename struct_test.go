@@ -184,10 +184,12 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 			IntsReplace     []int `coalesceStrategy:"replace"`
 			IntsUnion       []int `coalesceStrategy:"union"`
 			IntsAppend      []int `coalesceStrategy:"append"`
+			IntsIndex       []int `coalesceStrategy:"index"`
 			Foos            []foo
 			FoosReplace     []foo    `coalesceStrategy:"replace"`
 			FoosUnion       []foo    `coalesceStrategy:"union"`
 			FoosAppend      []foo    `coalesceStrategy:"append"`
+			FoosIndex       []foo    `coalesceStrategy:"index"`
 			FoosMergeKey    []foo    `coalesceStrategy:"merge" coalesceMergeKey:"Int"`
 			FooPtrsMergeKey []*foo   `coalesceStrategy:"merge" coalesceMergeKey:"IntPtr"`
 			NestedSlice     []nested `coalesceStrategy:"merge" coalesceMergeKey:"Key"`
@@ -218,9 +220,15 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 			},
 			{
 				"slice ints append",
-				bar{IntsUnion: []int{1, 2}},
-				bar{IntsUnion: []int{2, 3}},
-				bar{IntsUnion: []int{1, 2, 2, 3}},
+				bar{IntsAppend: []int{1, 2}},
+				bar{IntsAppend: []int{2, 3}},
+				bar{IntsAppend: []int{1, 2, 2, 3}},
+			},
+			{
+				"slice ints index",
+				bar{IntsIndex: []int{1, 2, 3}},
+				bar{IntsIndex: []int{-1, -2}},
+				bar{IntsIndex: []int{-1, -2, 3}},
 			},
 			{
 				"slice foos default",
@@ -247,6 +255,12 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 				bar{FoosAppend: []foo{{Int: 1}, {Int: 2}, {Int: 2}, {Int: 3}}},
 			},
 			{
+				"slice foos index",
+				bar{FoosIndex: []foo{{Int: 1}, {Int: 2}, {Int: 3}}},
+				bar{FoosIndex: []foo{{Int: -1}, {Int: -2}}},
+				bar{FoosIndex: []foo{{Int: -1}, {Int: -2}, {Int: 3}}},
+			},
+			{
 				"slice foos merge key",
 				bar{FoosMergeKey: []foo{{Int: 1}, {Int: 2}}},
 				bar{FoosMergeKey: []foo{{Int: 2}, {Int: 3}}},
@@ -271,13 +285,7 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 				coalescer.WithFallback(NewMainCoalescer())
 				got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 				require.NoError(t, err)
-				assert.ElementsMatch(t, tt.want.Ints, got.Interface().(bar).Ints)
-				assert.ElementsMatch(t, tt.want.IntsReplace, got.Interface().(bar).IntsReplace)
-				assert.ElementsMatch(t, tt.want.Foos, got.Interface().(bar).Foos)
-				assert.ElementsMatch(t, tt.want.FoosReplace, got.Interface().(bar).FoosReplace)
-				assert.ElementsMatch(t, tt.want.FoosUnion, got.Interface().(bar).FoosUnion)
-				assert.ElementsMatch(t, tt.want.FoosMergeKey, got.Interface().(bar).FoosMergeKey)
-				assert.ElementsMatch(t, tt.want.FooPtrsMergeKey, got.Interface().(bar).FooPtrsMergeKey)
+				assert.Equal(t, tt.want, got.Interface())
 			})
 		}
 	})
@@ -304,6 +312,9 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 		}
 		type invalidUnion struct {
 			Int int `coalesceStrategy:"union"`
+		}
+		type invalidIndex struct {
+			Int int `coalesceStrategy:"index"`
 		}
 		type invalidMerge struct {
 			Int int `coalesceStrategy:"merge"`
@@ -341,6 +352,12 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 				invalidUnion{Int: 1},
 				invalidUnion{Int: 2},
 				"field goalesce.invalidUnion.Int: union strategy is only supported for slices",
+			},
+			{
+				"invalid index",
+				invalidIndex{Int: 1},
+				invalidIndex{Int: 2},
+				"field goalesce.invalidIndex.Int: index strategy is only supported for slices",
 			},
 			{
 				"invalid merge",

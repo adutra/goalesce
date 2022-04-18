@@ -58,7 +58,7 @@ func TestNewSliceCoalescer(t *testing.T) {
 		type foo struct {
 			Int int
 		}
-		got := NewSliceCoalescer(WithMergeByKey(reflect.TypeOf(foo{}), func(value reflect.Value) reflect.Value {
+		got := NewSliceCoalescer(WithMergeByKey(reflect.TypeOf(foo{}), func(_ int, value reflect.Value) reflect.Value {
 			return reflect.ValueOf(value.Interface().(foo).Int)
 		}))
 		assert.Equal(t, &defaultCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
@@ -73,11 +73,11 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 	type bar struct {
 		Int *int
 	}
-	fooMergeFunc := func(value reflect.Value) reflect.Value {
+	fooMergeFunc := func(_ int, value reflect.Value) reflect.Value {
 		elem := value.Interface().(foo)
 		return reflect.ValueOf(elem.Int)
 	}
-	barPtrMergeFunc := func(value reflect.Value) reflect.Value {
+	barPtrMergeFunc := func(_ int, value reflect.Value) reflect.Value {
 		elem := value.Interface().(*bar)
 		if elem == nil {
 			elem = &bar{}
@@ -636,6 +636,118 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 4}, {Int: 5}},
 		},
 		{
+			"[]foo default merge by index zero",
+			[]foo(nil),
+			[]foo(nil),
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]foo(nil),
+		},
+		{
+			"[]foo default merge by index mixed zero",
+			[]foo{},
+			[]foo(nil),
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]foo{},
+		},
+		{
+			"[]foo default merge by index mixed zero 2",
+			[]foo(nil),
+			[]foo{},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]foo{},
+		},
+		{
+			"[]foo default merge by index empty",
+			[]foo{},
+			[]foo{},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]foo{},
+		},
+		{
+			"[]foo default merge by index mixed empty",
+			[]foo{{Int: 1}},
+			[]foo{},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]foo{{Int: 1}},
+		},
+		{
+			"[]foo default merge by index mixed empty 2",
+			[]foo{},
+			[]foo{{Int: 2}},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]foo{{Int: 2}},
+		},
+		{
+			"[]foo default merge by index non empty 1",
+			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
+			[]foo{{Int: 4}, {Int: 5}},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]foo{{Int: 4}, {Int: 5}, {Int: 3}},
+		},
+		{
+			"[]foo default merge by index non empty 2",
+			[]foo{{Int: 4}, {Int: 5}},
+			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
+		},
+		{
+			"[]foo merge by index zero",
+			[]foo(nil),
+			[]foo(nil),
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]foo(nil),
+		},
+		{
+			"[]foo merge by index mixed zero",
+			[]foo{},
+			[]foo(nil),
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]foo{},
+		},
+		{
+			"[]foo merge by index mixed zero 2",
+			[]foo(nil),
+			[]foo{},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]foo{},
+		},
+		{
+			"[]foo merge by index empty",
+			[]foo{},
+			[]foo{},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]foo{},
+		},
+		{
+			"[]foo merge by index mixed empty",
+			[]foo{{Int: 1}},
+			[]foo{},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]foo{{Int: 1}},
+		},
+		{
+			"[]foo merge by index mixed empty 2",
+			[]foo{},
+			[]foo{{Int: 2}},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]foo{{Int: 2}},
+		},
+		{
+			"[]foo merge by index non empty 1",
+			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
+			[]foo{{Int: 4}, {Int: 5}},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]foo{{Int: 4}, {Int: 5}, {Int: 3}},
+		},
+		{
+			"[]foo merge by index non empty 2",
+			[]foo{{Int: 4}, {Int: 5}},
+			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
+		},
+		{
 			"[]foo append zero",
 			[]foo(nil),
 			[]foo(nil),
@@ -978,6 +1090,120 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			[]SliceCoalescerOption{WithMergeByKey(reflect.PtrTo(reflect.TypeOf(bar{})), barPtrMergeFunc)},
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil, {Int: intPtr(4)}},
 		},
+
+		{
+			"[]bar default merge by index zero",
+			[]bar(nil),
+			[]bar(nil),
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]bar(nil),
+		},
+		{
+			"[]bar default merge by index mixed zero",
+			[]bar{},
+			[]bar(nil),
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]bar{},
+		},
+		{
+			"[]bar default merge by index mixed zero 2",
+			[]bar(nil),
+			[]bar{},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]bar{},
+		},
+		{
+			"[]bar default merge by index empty",
+			[]bar{},
+			[]bar{},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]bar{},
+		},
+		{
+			"[]bar default merge by index mixed empty",
+			[]bar{{Int: intPtr(1)}},
+			[]bar{},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]bar{{Int: intPtr(1)}},
+		},
+		{
+			"[]bar default merge by index mixed empty 2",
+			[]bar{},
+			[]bar{{Int: intPtr(2)}},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]bar{{Int: intPtr(2)}},
+		},
+		{
+			"[]bar default merge by index non empty 1",
+			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
+			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}, {Int: intPtr(3)}},
+		},
+		{
+			"[]bar default merge by index non empty 2",
+			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}},
+			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
+			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
+		},
+		{
+			"[]bar merge by index zero",
+			[]bar(nil),
+			[]bar(nil),
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]bar(nil),
+		},
+		{
+			"[]bar merge by index mixed zero",
+			[]bar{},
+			[]bar(nil),
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]bar{},
+		},
+		{
+			"[]bar merge by index mixed zero 2",
+			[]bar(nil),
+			[]bar{},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]bar{},
+		},
+		{
+			"[]bar merge by index empty",
+			[]bar{},
+			[]bar{},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]bar{},
+		},
+		{
+			"[]bar merge by index mixed empty",
+			[]bar{{Int: intPtr(1)}},
+			[]bar{},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]bar{{Int: intPtr(1)}},
+		},
+		{
+			"[]bar merge by index mixed empty 2",
+			[]bar{},
+			[]bar{{Int: intPtr(2)}},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]bar{{Int: intPtr(2)}},
+		},
+		{
+			"[]bar merge by index non empty 1",
+			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
+			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}, {Int: intPtr(3)}},
+		},
+		{
+			"[]bar merge by index non empty 2",
+			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}},
+			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
+			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
+		},
+
 		{
 			"[]*bar append zero",
 			[]*bar(nil),
@@ -1110,14 +1336,14 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 		assert.EqualError(t, err, "fake")
 	})
 	t.Run("merge key func error", func(t *testing.T) {
-		coalescer := NewSliceCoalescer(WithMergeByKey(reflect.TypeOf(0), func(value reflect.Value) reflect.Value {
+		coalescer := NewSliceCoalescer(WithMergeByKey(reflect.TypeOf(0), func(int, reflect.Value) reflect.Value {
 			return reflect.Value{}
 		}))
 		_, err := coalescer.Coalesce(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{}))
 		assert.EqualError(t, err, "slice merge key func returned nil")
 		_, err = coalescer.Coalesce(reflect.ValueOf([]int{}), reflect.ValueOf([]int{1}))
 		assert.EqualError(t, err, "slice merge key func returned nil")
-		coalescer = NewSliceCoalescer(WithMergeByKey(reflect.TypeOf(0), func(value reflect.Value) reflect.Value {
+		coalescer = NewSliceCoalescer(WithMergeByKey(reflect.TypeOf(0), func(int, reflect.Value) reflect.Value {
 			return reflect.ValueOf([]int{1, 2, 3})
 		}))
 		_, err = coalescer.Coalesce(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{}))

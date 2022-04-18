@@ -83,7 +83,14 @@ func Example() {
 	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
 	fmt.Printf("Coalesce(%+v, %+v, ListAppend) = %+v\n", v1, v2, coalesced)
 
-	// Coalescing slices with merge-by semantics, merge key = User.Id
+	// Coalescing slices with merge-by-index semantics
+	v1 = []int{1, 2, 3}
+	v2 = []int{-1, -2}
+	sliceCoalescer = goalesce.NewSliceCoalescer(goalesce.WithDefaultMergeByIndex())
+	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+	fmt.Printf("Coalesce(%+v, %+v, MergeByIndex) = %+v\n", v1, v2, coalesced)
+
+	// Coalescing slices with merge-by-key semantics, merge key = field User.Id
 	v1 = []User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
 	v2 = []User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
 	sliceCoalescer = goalesce.NewSliceCoalescer(goalesce.WithMergeByField(reflect.TypeOf(User{}), "Id"))
@@ -140,6 +147,7 @@ func Example() {
 	// Coalesce([1 2], []) = []
 	// Coalesce([1 2], [2 3], SetUnion) = [1 2 3]
 	// Coalesce([1 2], [2 3], ListAppend) = [1 2 2 3]
+	// Coalesce([1 2 3], [-1 -2], MergeByIndex) = [-1 -2 3]
 	// Coalesce([{Id:1 Name:Alice Age:0} {Id:2 Name:Bob Age:0}], [{Id:2 Name: Age:30} {Id:1 Name: Age:20}], MergeByField) = [{Id:1 Name:Alice Age:20} {Id:2 Name:Bob Age:30}]
 	// Coalesced movie:
 	// {
@@ -180,13 +188,35 @@ func ExampleWithMergeByField() {
 		Name string
 		Age  int
 	}
+	var v1, v2, coalesced interface{}
 	sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithMergeByField(reflect.TypeOf(User{}), "Id"))
-	v1 := []User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
-	v2 := []User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
-	coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+
+	v1 = []User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
+	v2 = []User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
+	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
 	fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
+
+	// also works on slices of *User:
+	v1 = []*User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
+	v2 = []*User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
+	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+	jsn, _ := json.MarshalIndent(coalesced, "", "  ")
+	fmt.Printf("Coalesced users:\n%+v\n", string(jsn))
 	// output:
 	// Coalesce([{Id:1 Name:Alice Age:0} {Id:2 Name:Bob Age:0}], [{Id:2 Name: Age:30} {Id:1 Name: Age:20}]) = [{Id:1 Name:Alice Age:20} {Id:2 Name:Bob Age:30}]
+	// Coalesced users:
+	// [
+	//   {
+	//     "Id": 1,
+	//     "Name": "Alice",
+	//     "Age": 20
+	//   },
+	//   {
+	//     "Id": 2,
+	//     "Name": "Bob",
+	//     "Age": 30
+	//   }
+	// ]
 }
 
 func ExampleSliceMergeKeyFunc() {
@@ -195,12 +225,12 @@ func ExampleSliceMergeKeyFunc() {
 		Name string
 		Age  int
 	}
-	mergeKeyFunc := func(v reflect.Value) reflect.Value {
+	mergeKeyFunc := func(_ int, v reflect.Value) reflect.Value {
 		return v.FieldByName("Id")
 	}
-	sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithMergeByKey(reflect.TypeOf(User{}), mergeKeyFunc))
 	v1 := []User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
 	v2 := []User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
+	sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithMergeByKey(reflect.TypeOf(User{}), mergeKeyFunc))
 	coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
 	fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
 	// output:

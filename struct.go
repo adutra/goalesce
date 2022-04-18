@@ -28,6 +28,7 @@ const (
 	CoalesceStrategyReplace = "replace"
 	CoalesceStrategyAppend  = "append"
 	CoalesceStrategyUnion   = "union"
+	CoalesceStrategyIndex   = "index"
 	CoalesceStrategyMerge   = "merge"
 )
 
@@ -118,6 +119,8 @@ func (c *structCoalescer) fieldCoalescerFromTag(structType reflect.Type, field r
 		return c.appendFieldCoalescer(structType, field)
 	case CoalesceStrategyUnion:
 		return c.unionFieldCoalescer(structType, field)
+	case CoalesceStrategyIndex:
+		return c.indexFieldCoalescer(structType, field)
 	case CoalesceStrategyMerge:
 		return c.mergeFieldCoalescer(structType, field)
 	default:
@@ -139,6 +142,16 @@ func (c *structCoalescer) unionFieldCoalescer(structType reflect.Type, field ref
 	return &sliceMergeCoalescer{
 		fallback:     c.fallback,
 		mergeKeyFunc: SliceUnion,
+	}, nil
+}
+
+func (c *structCoalescer) indexFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
+	if field.Type.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("field %s.%s: index strategy is only supported for slices", structType.String(), field.Name)
+	}
+	return &sliceMergeCoalescer{
+		fallback:     c.fallback,
+		mergeKeyFunc: SliceIndex,
 	}, nil
 }
 

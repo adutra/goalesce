@@ -26,11 +26,6 @@ When called with no options, the function uses the following coalescing algorith
 The `Coalesce` function can be called with a list of options to modify its default coalescing behavior. See the
 documentation of each option for details.
 
-## Advanced usage
-
-The `Coalescer` interface allows for custom coalescing algorithms to be implemented. By passing custom coalescers to
-the `Coalesce` function, its behavior can be modified in any way.
-
 ## Examples 
 
 ### Coalescing maps
@@ -121,12 +116,57 @@ Output
 
     Coalesce([1 2], [2 3], ListAppend) = [1 2 2 3]
 
-The resulting slice's element order is deterministic: the two slices are simply concatenated together.
+The resulting slice's element order is deterministic.
 
-#### Using "merge-by" strategy
+#### Using "merge-by-index" strategy
 
-The "merge-by" strategy can be used to coalesce two slices together using a merge key. The most common usage for 
-this strategy is to coalesce slices of structs, where the merge key is the name of a primary key field:
+The "merge-by-index" strategy can be used to coalesce two slices together using their indices as the merge key:
+
+```go
+v1 := []int{1, 2, 3}
+v2 := []int{-1, -2}
+sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultMergeByIndex())
+coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+fmt.Printf("Coalesce(%+v, %+v, MergeByIndex) = %+v\n", v1, v2, coalesced)
+```
+
+Output:
+
+    Coalesce([1 2 3], [-1 -2], MergeByIndex) = [-1 -2 3]
+
+
+#### Using "merge-by-key" strategy
+
+The "merge-by-key" strategy can be used to coalesce two slices together using an arbitrary merge key:
+
+```go
+type User struct {
+    Id   int
+    Name string
+    Age  int
+}
+mergeKeyFunc := func(_ int, v reflect.Value) reflect.Value {
+    return v.FieldByName("Id")
+}
+v1 := []User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
+v2 := []User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
+sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithMergeByKey(reflect.TypeOf(User{}), mergeKeyFunc))
+coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
+```
+
+Output:
+
+    Coalesce([{Id:1 Name:Alice Age:0} {Id:2 Name:Bob Age:0}], [{Id:2 Name: Age:30} {Id:1 Name: Age:20}]) = [{Id:1 Name:Alice Age:20} {Id:2 Name:Bob Age:30}]
+
+This strategy is similar to Kubernetes' [strategic merge patch].
+
+The function `mergeKeyFunc` must be of type `SliceMergeKeyFunc`. It will be invoked with the index and value of the
+slice element to extract a merge key from.
+
+The most common usage for this strategy is to coalesce slices of structs, where the merge key is the name of a primary
+key field. In this case, we can use the `WithMergeByField` option to specify the field name to use as merge key, and 
+simplify the example above as follows:
 
 ```go
 v1 := []User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
@@ -140,9 +180,32 @@ Output:
 
     Coalesce([{Id:1 Name:Alice} {Id:2 Name:Bob}], [{Id:1 Age:20} {Id:2 Age:30}], MergeByField) = [{Id:1 Name:Alice Age:20} {Id:2 Name:Bob Age:30}]
 
-This strategy is similar to Kubernetes' [strategic merge patch].
+The option `WithMergeByField` also works out-of-the-box on slices of pointers to structs:
 
-[strategic merge patch]:https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/#notes-on-the-strategic-merge-patch
+```go
+v1 := []*User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
+v2 := []*User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
+coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+jsn, _ := json.MarshalIndent(coalesced, "", "  ")
+println(string(jsn))
+```
+
+Output:
+
+```json
+[
+  {
+    "Id": 1,
+    "Name": "Alice",
+    "Age": 20
+  },
+  {
+    "Id": 2,
+    "Name": "Bob",
+    "Age": 30
+  }
+]
+```    
 
 ### Coalescing structs
 
@@ -171,12 +234,16 @@ When the default behavior is not desired or sufficient, per-field coalescing str
 
 The struct tag `coalesceStrategy` allows to specify the following per-field strategies:
 
-| Strategy  | Valid on     | effect                                                        |
-|-----------|--------------|---------------------------------------------------------------|
-| `replace` | Any field    | Applies "replace" semantics.                                  |
-| `union`   | Slice fields | Applies "set-union" semantics.                                |
-| `append`  | Slice fields | Applies "list-append" semantics.                              |   
-| `merge`   | Slice fields | Applies "merge" semantics. A merge key must also be provided. |   
+| Strategy  | Valid on               | effect                              |
+|-----------|------------------------|-------------------------------------|
+| `replace` | Any field              | Applies "replace" semantics.        |
+| `union`   | Slice fields           | Applies "set-union" semantics.      |
+| `append`  | Slice fields           | Applies "list-append" semantics.    |   
+| `index`   | Slice fields           | Applies "merge-by-index" semantics. |   
+| `merge`   | Slice of struct fields | Applies "merge-by-key" semantics.   |   
+
+With `merge`, a merge key must also be provided in another struct tag: `coalesceMergeKey`. The merge key _must_ be the
+name of a field in the slice's struct element type.
 
 Example:
 
@@ -258,3 +325,10 @@ Output:
 ```
 
 See the [online documentation](https://pkg.go.dev/github.com/adutra/goalesce?tab=doc) for more examples.
+
+## Advanced usage
+
+The `Coalescer` interface allows for custom coalescing algorithms to be implemented. By passing custom coalescers to
+the `Coalesce` function, its behavior can be modified in any way.
+
+[strategic merge patch]:https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/#notes-on-the-strategic-merge-patch

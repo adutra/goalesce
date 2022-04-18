@@ -198,9 +198,6 @@ func ExampleWithDefaultSetUnion() {
 		v2 := []*int{nil, intPtr(1)}      // nil will be coalesced as the zero-value (0)
 		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
 		fmt.Printf("Coalesce(%+v, %+v, SetUnion) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
-		for _, elem := range coalesced.([]*int) {
-			fmt.Printf("%T %+v\n", elem, *elem)
-		}
 	}
 	// output:
 	// Coalesce([1 2], [2 3], SetUnion) = [1 2 3]
@@ -224,7 +221,7 @@ func ExampleWithDefaultListAppend() {
 		fmt.Printf("Coalesce(%+v, %+v, ListAppend) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
 	}
 	// output:
-	// Coalesce([1 2], [2 3], SetUnion) = [1 2 2 3]
+	// Coalesce([1 2], [2 3], ListAppend) = [1 2 2 3]
 	// Coalesce([&0 &0], [*int(nil) &1], ListAppend) = [&0 &0 *int(nil) &1]
 }
 

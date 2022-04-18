@@ -55,6 +55,23 @@ func Test_pointerCoalescer_Coalesce(t *testing.T) {
 	type foo struct {
 		Int int
 	}
+	type cycle struct {
+		Cycle *cycle
+	}
+	simpleCycle := func() *cycle {
+		c := &cycle{}
+		c.Cycle = c
+		return c
+	}
+	complexCycle := func() *cycle {
+		c1 := &cycle{}
+		c2 := &cycle{}
+		c3 := &cycle{}
+		c1.Cycle = c2
+		c2.Cycle = c3
+		c3.Cycle = c1
+		return c1
+	}
 	tests := []struct {
 		name string
 		v1   interface{}
@@ -85,10 +102,65 @@ func Test_pointerCoalescer_Coalesce(t *testing.T) {
 			&foo{Int: 2},
 			&foo{Int: 2},
 		},
+		{
+			"cycle 1",
+			simpleCycle(),
+			(*cycle)(nil),
+			simpleCycle(), // unnoticed
+		},
+		{
+			"cycle 2",
+			(*cycle)(nil),
+			simpleCycle(),
+			simpleCycle(), // unnoticed
+		},
+		{
+			"cycle 3",
+			simpleCycle(),
+			simpleCycle(),
+			&cycle{Cycle: &cycle{Cycle: &cycle{}}},
+		},
+		{
+			"cycle 4",
+			&cycle{Cycle: &cycle{}},
+			simpleCycle(),
+			simpleCycle(), // unnoticed
+		},
+		{
+			"cycle 5",
+			simpleCycle(),
+			&cycle{Cycle: &cycle{}},
+			simpleCycle(), // unnoticed
+		},
+		{
+			"cycle 6",
+			simpleCycle(),
+			&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}}},
+			&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}}},
+		},
+		{
+			"cycle 7",
+			complexCycle(),
+			&cycle{Cycle: &cycle{}},
+			complexCycle(), // unnoticed
+		},
+		{
+			"cycle 8",
+			complexCycle(),
+			complexCycle(),
+			&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}}},
+		},
+		{
+			"cycle 9",
+			complexCycle(),
+			&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}}}},
+			&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}}}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			coalescer := NewPointerCoalescer()
+			coalescer.WithFallback(NewMainCoalescer())
 			got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())
@@ -99,6 +171,18 @@ func Test_pointerCoalescer_Coalesce(t *testing.T) {
 		assert.EqualError(t, err, "types do not match: *int != *string")
 		_, err = NewPointerCoalescer().Coalesce(reflect.ValueOf(1), reflect.ValueOf(2))
 		assert.EqualError(t, err, "values have wrong kind: expected ptr, got int")
+	})
+	t.Run("cycle errors", func(t *testing.T) {
+		withCycle := reflect.ValueOf(simpleCycle())
+		withoutCycle := reflect.ValueOf(&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}}})
+		coalescer := NewPointerCoalescer(WithOnCycleReturnError())
+		coalescer.WithFallback(NewMainCoalescer(WithPointerCoalescer(coalescer)))
+		_, err := coalescer.Coalesce(withCycle, withoutCycle)
+		assert.EqualError(t, err, "*goalesce.cycle: cycle detected")
+		coalescer = NewPointerCoalescer(WithOnCycleReturnError())
+		coalescer.WithFallback(NewMainCoalescer(WithPointerCoalescer(coalescer)))
+		_, err = coalescer.Coalesce(withoutCycle, withCycle)
+		assert.EqualError(t, err, "*goalesce.cycle: cycle detected")
 	})
 	t.Run("fallback error", func(t *testing.T) {
 		m := new(mockCoalescer)

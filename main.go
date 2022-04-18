@@ -22,7 +22,7 @@ import (
 type MainCoalescerOption func(c *mainCoalescer)
 
 // WithAtomicType will apply "replace" semantics to the given type, instead of its default coalesce semantics. When 2
-// non-zero values of this type are coalesced, the second value is returned as is.
+// non-zero-values of this type are coalesced, the second value is returned as is.
 func WithAtomicType(t reflect.Type) MainCoalescerOption {
 	return WithTypeCoalescer(t, &defaultCoalescer{})
 }

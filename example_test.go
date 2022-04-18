@@ -31,7 +31,7 @@ func Example() {
 	fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
 
 	v1 = 1
-	v2 = 0 // zero value for ints
+	v2 = 0 // zero-value for ints
 	coalesced, _ = goalesce.Coalesce(v1, v2)
 	fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
 
@@ -65,7 +65,7 @@ func Example() {
 	fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
 
 	v1 = []int{1, 2}
-	v2 = []int{} // empty slice is NOT a zero value!
+	v2 = []int{} // empty slice is NOT a zero-value!
 	coalesced, _ = goalesce.Coalesce(v1, v2)
 	fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
 

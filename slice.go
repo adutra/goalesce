@@ -167,8 +167,8 @@ func (c *sliceAppendCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, er
 func (c *sliceAppendCoalescer) WithFallback(Coalescer) {}
 
 // SliceMergeKeyFunc is a function that extracts a merge key from a slice element's index and value. The passed element
-// may be the zero value for the slice element type, but it will never be an invalid value. The returned merge key can
-// be a zero value, but cannot be invalid; moreover, it must be comparable as it will be stored internally in a
+// may be the zero-value for the slice element type, but it will never be an invalid value. The returned merge key can
+// be a zero-value, but cannot be invalid; moreover, it must be comparable as it will be stored internally in a
 // temporary map during the merge.
 type SliceMergeKeyFunc func(index int, element reflect.Value) (key reflect.Value)
 
@@ -192,9 +192,9 @@ var SliceIndex SliceMergeKeyFunc = func(index int, element reflect.Value) (key r
 // value will be used instead, but beware that this may result in nondeterministic merge results.
 func newMergeByField(field string) SliceMergeKeyFunc {
 	return func(_ int, elem reflect.Value) reflect.Value {
-		// the slice element itself may be a pointer; we want to dereference it and return a zero value if it's nil.
+		// the slice element itself may be a pointer; we want to dereference it and return a zero-value if it's nil.
 		elem = safeIndirect(elem)
-		// the slice element's field may also be a pointer; again, we want to dereference it and return a zero value
+		// the slice element's field may also be a pointer; again, we want to dereference it and return a zero-value
 		// if it's nil.
 		return safeIndirect(elem.FieldByName(field))
 	}

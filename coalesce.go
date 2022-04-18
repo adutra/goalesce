@@ -24,13 +24,13 @@ import (
 //
 //   - If both values are nil, return nil.
 //   - If one value is nil, return the other value.
-//   - If both values are zero values for the type, return the type's zero value.
-//   - If one value is a zero value for the type, return the other value.
-//   - If both values are non-zero values, the values are coalesced using the following rules:
+//   - If both values are zero-values for the type, return the type's zero-value.
+//   - If one value is a zero-value for the type, return the other value.
+//   - Otherwise, the values are coalesced using the following rules:
 //     - If both values are pointers, coalesce the values pointed to.
-//     - If both values are structs, coalesce the structs recursively, field by field.
 //     - If both values are maps, coalesce the maps recursively, key by key.
-//     - Otherwise, return the second value.
+//     - If both values are structs, coalesce the structs recursively, field by field.
+//     - For other types (including slices), return the second value ("replace" semantics)
 //
 // The function never modifies its inputs. It may return one of the (unmodified) inputs as the coalesced value, but
 // whenever changes to the inputs are required, the function always returns an entirely newly-allocated value.

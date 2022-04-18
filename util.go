@@ -19,12 +19,12 @@ import (
 	"reflect"
 )
 
-// safeIndirect is a variant of reflect.Indirect that returns a zero value if the value is a nil
+// safeIndirect is a variant of reflect.Indirect that returns a zero-value if the value is a nil
 // pointer. Because of that, this function never returns an invalid value.
 func safeIndirect(v reflect.Value) reflect.Value {
 	indirect := reflect.Indirect(v)
 	if !indirect.IsValid() {
-		// nil pointer: return zero value
+		// nil pointer: return zero-value
 		indirect = reflect.Zero(v.Type().Elem())
 	}
 	return indirect

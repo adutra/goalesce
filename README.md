@@ -13,25 +13,59 @@ It coalesces the 2 values into a single value and returns that value.
 
 When called with no options, the function uses the following coalescing algorithm:
 
-  - If both values are untyped nils, return nil.
-  - If one value is untyped nil, return the other value.
-  - If both values are zero values for the type, return the type's zero value.
-  - If one value is a zero value for the type, return the other value.
-  - If both values are non-zero values, the values are coalesced using the following rules:
-    - If both values are pointers, coalesce the values pointed to.
-    - If both values are structs, coalesce the structs recursively, field by field.
-    - If both values are maps, coalesce the maps recursively, key by key.
-    - Otherwise, return the second value.
+- If both values are untyped nils, return nil.
+- If one value is untyped nil, return the other value.
+- If both values are [zero-values] for the type, return the type's zero-value.
+- If one value is a zero-value for the type, return the other value.
+- Otherwise, the values are coalesced using the following rules:
+  - If both values are pointers, coalesce the values pointed to.
+  - If both values are maps, coalesce the maps recursively, key by key.
+  - If both values are structs, coalesce the structs recursively, field by field.
+  - For other types (including slices), return the second value ("replace" semantics).
+
+Note that by default, slices are coalesced with replace semantics, that is, the second slice overwrites the first one
+completely. It is possible to change this behavior, see examples below.
 
 The `Coalesce` function can be called with a list of options to modify its default coalescing behavior. See the
 documentation of each option for details.
 
 ## Examples 
 
+### Coalescing scalars
+
+Scalars are always coalesced with replace semantics when both values are non-zero-values:
+
+```go
+v1 := "abc"
+v2 := "def"
+coalesced, _ := goalesce.Coalesce(v1, v2)
+fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
+```
+
+Output:
+
+    Coalesce(abc, def) = def
+
+### Coalescing pointers
+
+Pointers are coalesced by coalescing the values they point to (which could be nil):
+
+```go
+stringPtr := func(s string) *string { return &s }
+v1 := stringPtr("abc")
+v2 := stringPtr("def")
+coalesced, _ := goalesce.Coalesce(v1, v2)
+fmt.Printf("Coalesce(%+v, %+v) = %+v\n", *v1, *v2, *(coalesced.(*string)))
+```
+
+Output:
+
+    Coalesce(abc, def) = def
+
 ### Coalescing maps
 
-When both maps are non-zero, the default behavior is to coalesce the two maps key by key, recursively coalescing the
-values.
+When both maps are non-zero-values, the default behavior is to coalesce the two maps key by key, recursively coalescing
+the values.
 
 ```go
 v1 := map[int]string{1: "a", 2: "b"}
@@ -46,7 +80,7 @@ Output:
 
 ### Coalescing slices
 
-When both slices are non-zero, the default behavior is to _replace_ the first slice with the second one: 
+When both slices are non-zero-values, the default behavior is to _replace_ the first slice with the second one: 
 
 ```go
 v1 := []int{1, 2}
@@ -59,9 +93,9 @@ Output:
 
     Coalesce([1 2], [2 3]) = [2 3]
 
-This is indeed the safest choice when coalescing slices, but other coalescing strategies can be used.
+This is indeed the safest choice when coalescing slices, but other coalescing strategies can be used (see below).
 
-Note: an empty slice is _not_ a zero value for a slice. Therefore, when the second slice is an empty slice, an empty 
+Note: an empty slice is _not_ a zero-value for a slice. Therefore, when the second slice is an empty slice, an empty 
 slice is returned:
 
 ```go
@@ -133,7 +167,6 @@ fmt.Printf("Coalesce(%+v, %+v, MergeByIndex) = %+v\n", v1, v2, coalesced)
 Output:
 
     Coalesce([1 2 3], [-1 -2], MergeByIndex) = [-1 -2 3]
-
 
 #### Using "merge-by-key" strategy
 
@@ -209,7 +242,7 @@ Output:
 
 ### Coalescing structs
 
-When both structs are non-zero, the default behavior is to coalesce the two structs field by field, recursively
+When both structs are non-zero-values, the default behavior is to coalesce the two structs field by field, recursively
 coalescing their values.
 
 ```go
@@ -230,7 +263,7 @@ Output:
 
 #### Per-field coalescing strategies
 
-When the default behavior is not desired or sufficient, per-field coalescing strategies can be used. 
+When the default struct coalescing behavior is not desired or sufficient, per-field coalescing strategies can be used. 
 
 The struct tag `coalesceStrategy` allows to specify the following per-field strategies:
 
@@ -331,4 +364,5 @@ See the [online documentation](https://pkg.go.dev/github.com/adutra/goalesce?tab
 The `Coalescer` interface allows for custom coalescing algorithms to be implemented. By passing custom coalescers to
 the `Coalesce` function, its behavior can be modified in any way.
 
+[zero-values]:https://go.dev/ref/spec#The_zero_value
 [strategic merge patch]:https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/#notes-on-the-strategic-merge-patch

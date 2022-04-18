@@ -17,7 +17,7 @@ package goalesce
 import "reflect"
 
 // NewDefaultCoalescer returns a coalescer that always applies "replace" semantics when coalescing. In other words, this
-// coalescer does not coalesce anything, it simply returns v1 if v2 is the zero value for its type, and v2 otherwise. It
+// coalescer does not coalesce anything, it simply returns v1 if v2 is the zero-value for its type, and v2 otherwise. It
 // is suitable for coalescing scalar types mostly.
 func NewDefaultCoalescer() Coalescer {
 	return &defaultCoalescer{}

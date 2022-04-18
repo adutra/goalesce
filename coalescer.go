@@ -23,7 +23,7 @@ import (
 type Coalescer interface {
 
 	// Coalesce coalesces the 2 values into a single value. All built-in implementations of this interface favor v2 over
-	// v1 in case of conflicts.  Note that the passed values can be zero values, but will never be invalid values; it is
+	// v1 in case of conflicts.  Note that the passed values can be zero-values, but will never be invalid values; it is
 	// also expected that implementors will never return invalid values if the returned error is nil.
 	Coalesce(v1, v2 reflect.Value) (reflect.Value, error)
 

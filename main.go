@@ -111,7 +111,7 @@ func (c *mainCoalescer) WithFallback(Coalescer) {
 	c.pointerCoalescer.WithFallback(c)
 }
 
-func (c mainCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
+func (c *mainCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
 	if err := checkTypesMatch(v1, v2); err != nil {
 		return reflect.Value{}, err
 	}

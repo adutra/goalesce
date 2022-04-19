@@ -39,7 +39,7 @@ Scalars are always coalesced with replace semantics when both values are non-zer
 v1 := "abc"
 v2 := "def"
 coalesced, _ := goalesce.Coalesce(v1, v2)
-fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
+fmt.Printf("Coalesce(%v, %v) = %v\n", v1, v2, coalesced)
 ```
 
 Output:
@@ -55,7 +55,7 @@ stringPtr := func(s string) *string { return &s }
 v1 := stringPtr("abc")
 v2 := stringPtr("def")
 coalesced, _ := goalesce.Coalesce(v1, v2)
-fmt.Printf("Coalesce(%+v, %+v) = %+v\n", *v1, *v2, *(coalesced.(*string)))
+fmt.Printf("Coalesce(%v, %v) = %v\n", *v1, *v2, *(coalesced.(*string)))
 ```
 
 Output:
@@ -102,7 +102,7 @@ slice is returned:
 v1 := []int{1, 2}
 v2 := []int{} // empty slice
 coalesced, _ := goalesce.Coalesce(v1, v2)
-fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
+fmt.Printf("Coalesce(%v, %v) = %v\n", v1, v2, coalesced)
 ```
 
 Output:
@@ -137,7 +137,7 @@ v2 := []*int{nil, intPtr(1)}      // nil will be coalesced as the zero-value (0)
 sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultSetUnion())
 coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
 for i, elem := range coalesced.([]*int) {
-    fmt.Printf("%v: %T %+v\n", i, elem, *elem)
+    fmt.Printf("%v: %T %v\n", i, elem, *elem)
 }
 ```
 
@@ -179,7 +179,7 @@ v1 := []int{1, 2, 3}
 v2 := []int{-1, -2}
 sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultMergeByIndex())
 coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
-fmt.Printf("Coalesce(%+v, %+v, MergeByIndex) = %+v\n", v1, v2, coalesced)
+fmt.Printf("Coalesce(%v, %v, MergeByIndex) = %v\n", v1, v2, coalesced)
 ```
 
 Output:

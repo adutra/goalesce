@@ -1,6 +1,7 @@
 [![GoVersion][GoVersionImg]][GoVersionLink]
 [![GoDoc][GoDocImg]][GoDocLink]
 [![GoReport][GoReportImg]][GoReportLink]
+[![codecov][CodeCovImg]][CodeCovLink]
 
 # Package goalesce
 
@@ -392,6 +393,7 @@ the `Coalesce` function, its behavior can be modified in any way.
 [GoVersionLink]: https://github.com/adutra/goalesce
 [GoReportImg]: https://goreportcard.com/badge/github.com/adutra/goalesce
 [GoReportLink]: https://goreportcard.com/report/github.com/adutra/goalesce
-
+[CodeCovImg]: https://codecov.io/gh/adutra/goalesce/branch/main/graph/badge.svg?token=REA57AEQZ6
+[CodeCovLink]: https://codecov.io/gh/adutra/goalesce
 [zero-values]:https://go.dev/ref/spec#The_zero_value
 [strategic merge patch]:https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/#notes-on-the-strategic-merge-patch

@@ -24,31 +24,27 @@ import (
 )
 
 func TestNewPointerCoalescer(t *testing.T) {
-	tests := []struct {
-		name string
-		opts []PointerCoalescerOption
-		want Coalescer
-	}{
-		{
-			name: "no opts",
-			opts: nil,
-			want: &pointerCoalescer{fallback: &defaultCoalescer{}},
-		},
-		{
-			name: "with opts",
-			opts: []PointerCoalescerOption{
-				func(c *pointerCoalescer) {
-					c.fallback = nil
-				},
-			},
-			want: &pointerCoalescer{fallback: nil},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, NewPointerCoalescer(tt.opts...))
-		})
-	}
+	t.Run("no opts", func(t *testing.T) {
+		got := NewPointerCoalescer()
+		assert.Equal(t, &pointerCoalescer{fallback: &defaultCoalescer{}}, got)
+	})
+	t.Run("with generic option", func(t *testing.T) {
+		var passed *pointerCoalescer
+		opt := func(c *pointerCoalescer) {
+			passed = c
+		}
+		returned := NewPointerCoalescer(opt)
+		assert.Equal(t, &pointerCoalescer{fallback: &defaultCoalescer{}}, returned)
+		assert.Equal(t, returned, passed)
+	})
+	t.Run("with error on cycle", func(t *testing.T) {
+		expected := &pointerCoalescer{
+			onCycleReturnError: true,
+			fallback:           &defaultCoalescer{},
+		}
+		actual := NewPointerCoalescer(WithOnCycleReturnError())
+		assert.Equal(t, expected, actual)
+	})
 }
 
 func Test_pointerCoalescer_Coalesce(t *testing.T) {

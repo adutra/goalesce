@@ -24,32 +24,19 @@ import (
 )
 
 func TestNewMapCoalescer(t *testing.T) {
-	tests := []struct {
-		name string
-		opts []MapCoalescerOption
-		want Coalescer
-	}{
-		{
-			name: "no opts",
-			opts: nil,
-			want: &mapCoalescer{fallback: &defaultCoalescer{}},
-		},
-		{
-			name: "with opts",
-			opts: []MapCoalescerOption{
-				func(c *mapCoalescer) {
-					c.fallback = nil
-				},
-			},
-			want: &mapCoalescer{fallback: nil},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, NewMapCoalescer(tt.opts...))
-		})
-	}
-
+	t.Run("no opts", func(t *testing.T) {
+		got := NewMapCoalescer()
+		assert.Equal(t, &mapCoalescer{fallback: &defaultCoalescer{}}, got)
+	})
+	t.Run("with generic option", func(t *testing.T) {
+		var passed *mapCoalescer
+		opt := func(c *mapCoalescer) {
+			passed = c
+		}
+		returned := NewMapCoalescer(opt)
+		assert.Equal(t, &mapCoalescer{fallback: &defaultCoalescer{}}, returned)
+		assert.Equal(t, returned, passed)
+	})
 }
 
 func Test_mapCoalescer_Coalesce(t *testing.T) {

@@ -28,6 +28,15 @@ func TestNewSliceCoalescer(t *testing.T) {
 		got := NewSliceCoalescer()
 		assert.Equal(t, &sliceCoalescer{defaultCoalescer: &defaultCoalescer{}}, got)
 	})
+	t.Run("with generic option", func(t *testing.T) {
+		var passed *sliceCoalescer
+		opt := func(c *sliceCoalescer) {
+			passed = c
+		}
+		returned := NewSliceCoalescer(opt)
+		assert.Equal(t, &sliceCoalescer{defaultCoalescer: &defaultCoalescer{}}, returned)
+		assert.Equal(t, returned, passed)
+	})
 	t.Run("with default union", func(t *testing.T) {
 		got := NewSliceCoalescer(WithDefaultSetUnion())
 		assert.IsType(t, &sliceMergeCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)

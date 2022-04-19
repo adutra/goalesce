@@ -26,31 +26,49 @@ import (
 func TestNewStructCoalescer(t *testing.T) {
 	t.Run("no opts", func(t *testing.T) {
 		got := NewStructCoalescer()
-		assert.Equal(
-			t,
-			&structCoalescer{
-				fallback: &defaultCoalescer{},
-			},
-			got,
-		)
+		assert.Equal(t, &structCoalescer{fallback: &defaultCoalescer{}}, got)
+	})
+	t.Run("with generic option", func(t *testing.T) {
+		var passed *structCoalescer
+		opt := func(c *structCoalescer) {
+			passed = c
+		}
+		returned := NewStructCoalescer(opt)
+		assert.Equal(t, &structCoalescer{fallback: &defaultCoalescer{}}, returned)
+		assert.Equal(t, returned, passed)
 	})
 	t.Run("with field coalescer", func(t *testing.T) {
 		type foo struct {
 			Int int
 		}
-		got := NewStructCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "Int", &defaultCoalescer{}))
+		m := &mockCoalescer{}
+		m.On("WithFallback", mock.Anything).Return()
+		m.Test(t)
+		actual := NewStructCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "Int", m))
 		assert.Equal(
 			t,
 			&structCoalescer{
 				fallback: &defaultCoalescer{},
 				fieldCoalescers: map[reflect.Type]map[string]Coalescer{
-					reflect.TypeOf(foo{}): {
-						"Int": &defaultCoalescer{},
-					},
+					reflect.TypeOf(foo{}): {"Int": m},
 				},
 			},
-			got)
+			actual)
+		main := NewMainCoalescer()
+		actual.WithFallback(main)
+		m.AssertCalled(t, "WithFallback", main)
 	})
+}
+
+func TestWithFieldCoalescer(t *testing.T) {
+	type User struct {
+		Id string
+	}
+	c := &structCoalescer{}
+	m := &mockCoalescer{}
+	WithFieldCoalescer(reflect.TypeOf(User{}), "Id", m)(c)
+	expected := map[reflect.Type]map[string]Coalescer{reflect.TypeOf(User{}): {"Id": m}}
+	assert.Equal(t, expected, c.fieldCoalescers)
 }
 
 func Test_structCoalescer_Coalesce(t *testing.T) {

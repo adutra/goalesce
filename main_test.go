@@ -16,6 +16,7 @@ package goalesce
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"reflect"
 	"testing"
 )
@@ -33,13 +34,36 @@ func TestNewMainCoalescer(t *testing.T) {
 		actual := NewMainCoalescer()
 		assert.Equal(t, expected, actual)
 	})
-	t.Run("with option", func(t *testing.T) {
+	t.Run("with generic option", func(t *testing.T) {
 		var passed *mainCoalescer
 		opt := func(c *mainCoalescer) {
 			passed = c
 		}
 		returned := NewMainCoalescer(opt)
 		assert.Equal(t, passed, returned)
+	})
+	t.Run("with type coalescer", func(t *testing.T) {
+		type foo struct {
+			Int int
+		}
+		m := &mockCoalescer{}
+		m.On("WithFallback", mock.Anything).Return()
+		m.Test(t)
+		expected := &mainCoalescer{}
+		expected.defaultCoalescer = &defaultCoalescer{}
+		expected.pointerCoalescer = &pointerCoalescer{fallback: expected}
+		expected.mapCoalescer = &mapCoalescer{fallback: expected}
+		expected.structCoalescer = &structCoalescer{fallback: expected}
+		expected.sliceCoalescer = &sliceCoalescer{
+			defaultCoalescer: &defaultCoalescer{},
+		}
+		expected.typeCoalescers = map[reflect.Type]Coalescer{
+			reflect.TypeOf(foo{}): m,
+		}
+		actual := NewMainCoalescer(WithTypeCoalescer(reflect.TypeOf(foo{}), m))
+		assert.Equal(t, expected, actual)
+		actual.WithFallback(actual)
+		m.AssertCalled(t, "WithFallback", actual)
 	})
 }
 
@@ -52,43 +76,43 @@ func TestWithAtomicType(t *testing.T) {
 
 func TestWithTypeCoalescer(t *testing.T) {
 	c := &mainCoalescer{}
-	mock := &mockCoalescer{}
-	WithTypeCoalescer(reflect.TypeOf(0), mock)(c)
-	expected := map[reflect.Type]Coalescer{reflect.TypeOf(0): mock}
+	m := &mockCoalescer{}
+	WithTypeCoalescer(reflect.TypeOf(0), m)(c)
+	expected := map[reflect.Type]Coalescer{reflect.TypeOf(0): m}
 	assert.Equal(t, expected, c.typeCoalescers)
 }
 
 func TestWithDefaultCoalescer(t *testing.T) {
 	c := &mainCoalescer{}
-	mock := &mockCoalescer{}
-	WithDefaultCoalescer(mock)(c)
-	assert.Equal(t, mock, c.defaultCoalescer)
+	m := &mockCoalescer{}
+	WithDefaultCoalescer(m)(c)
+	assert.Equal(t, m, c.defaultCoalescer)
 }
 
 func TestWithMapCoalescer(t *testing.T) {
 	c := &mainCoalescer{}
-	mock := &mockCoalescer{}
-	WithMapCoalescer(mock)(c)
-	assert.Equal(t, mock, c.mapCoalescer)
+	m := &mockCoalescer{}
+	WithMapCoalescer(m)(c)
+	assert.Equal(t, m, c.mapCoalescer)
 }
 
 func TestWithPointerCoalescer(t *testing.T) {
 	c := &mainCoalescer{}
-	mock := &mockCoalescer{}
-	WithPointerCoalescer(mock)(c)
-	assert.Equal(t, mock, c.pointerCoalescer)
+	m := &mockCoalescer{}
+	WithPointerCoalescer(m)(c)
+	assert.Equal(t, m, c.pointerCoalescer)
 }
 
 func TestWithSliceCoalescer(t *testing.T) {
 	c := &mainCoalescer{}
-	mock := &mockCoalescer{}
-	WithSliceCoalescer(mock)(c)
-	assert.Equal(t, mock, c.sliceCoalescer)
+	m := &mockCoalescer{}
+	WithSliceCoalescer(m)(c)
+	assert.Equal(t, m, c.sliceCoalescer)
 }
 
 func TestWithStructCoalescer(t *testing.T) {
 	c := &mainCoalescer{}
-	mock := &mockCoalescer{}
-	WithStructCoalescer(mock)(c)
-	assert.Equal(t, mock, c.structCoalescer)
+	m := &mockCoalescer{}
+	WithStructCoalescer(m)(c)
+	assert.Equal(t, m, c.structCoalescer)
 }

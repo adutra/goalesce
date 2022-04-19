@@ -66,6 +66,11 @@ type structCoalescer struct {
 
 func (c *structCoalescer) WithFallback(fallback Coalescer) {
 	c.fallback = fallback
+	for _, coalescers := range c.fieldCoalescers {
+		for _, coalescer := range coalescers {
+			coalescer.WithFallback(fallback)
+		}
+	}
 }
 
 func (c *structCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {

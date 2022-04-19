@@ -1,3 +1,7 @@
+[![GoVersion][GoVersionImg]][GoVersionLink]
+[![GoDoc][GoDocImg]][GoDocLink]
+[![GoReport][GoReportImg]][GoReportLink]
+
 # Package goalesce
 
 Package goalesce is a library for coalescing (a.k.a. merging) objects in Go. It can coalesce any type of object,
@@ -381,6 +385,13 @@ See the [online documentation](https://pkg.go.dev/github.com/adutra/goalesce?tab
 
 The `Coalescer` interface allows for custom coalescing algorithms to be implemented. By passing custom coalescers to
 the `Coalesce` function, its behavior can be modified in any way.
+
+[GoDocImg]: https://img.shields.io/badge/docs-golang-blue.svg
+[GoDocLink]: https://godoc.org/github.com/adutra/goalesce
+[GoVersionImg]: https://img.shields.io/github/go-mod/go-version/adutra/goalesce.svg
+[GoVersionLink]: https://github.com/adutra/goalesce
+[GoReportImg]: https://goreportcard.com/badge/github.com/adutra/goalesce
+[GoReportLink]: https://goreportcard.com/report/github.com/adutra/goalesce
 
 [zero-values]:https://go.dev/ref/spec#The_zero_value
 [strategic merge patch]:https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/#notes-on-the-strategic-merge-patch

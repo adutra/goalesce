@@ -1,7 +1,7 @@
 [![GoVersion][GoVersionImg]][GoVersionLink]
 [![GoDoc][GoDocImg]][GoDocLink]
 [![GoReport][GoReportImg]][GoReportLink]
-[![codecov][CodeCovImg]][CodeCovLink]
+[![CodeCov][CodeCovImg]][CodeCovLink]
 
 # Package goalesce
 

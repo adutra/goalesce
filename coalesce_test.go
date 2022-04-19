@@ -282,3 +282,10 @@ func TestCoalesce(t *testing.T) {
 		assert.EqualError(t, err, "types do not match: int != string")
 	})
 }
+
+func TestMustCoalesce(t *testing.T) {
+	assert.Equal(t, "def", MustCoalesce("abc", "def"))
+	assert.PanicsWithError(t, "types do not match: int != string", func() {
+		MustCoalesce(1, " abc")
+	})
+}

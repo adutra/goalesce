@@ -55,3 +55,12 @@ func Coalesce(o1, o2 interface{}, opts ...MainCoalescerOption) (coalesced interf
 	}
 	return result.Interface(), nil
 }
+
+// MustCoalesce is like Coalesce, but panics if the coalescing returns an error.
+func MustCoalesce(o1, o2 interface{}, opts ...MainCoalescerOption) interface{} {
+	coalesced, err := Coalesce(o1, o2, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return coalesced
+}

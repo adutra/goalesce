@@ -109,6 +109,9 @@ func (c *mainCoalescer) WithFallback(Coalescer) {
 	c.mapCoalescer.WithFallback(c)
 	c.structCoalescer.WithFallback(c)
 	c.pointerCoalescer.WithFallback(c)
+	for _, coalescer := range c.typeCoalescers {
+		coalescer.WithFallback(c)
+	}
 }
 
 func (c *mainCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {

@@ -21,8 +21,8 @@ import (
 // MainCoalescerOption is an option that can be passed the main Coalesce function to customize its coalescing behavior.
 type MainCoalescerOption func(c *mainCoalescer)
 
-// WithAtomicType will apply "replace" semantics to the given type, instead of its default coalesce semantics. When 2
-// non-zero-values of this type are coalesced, the second value is returned as is.
+// WithAtomicType causes the given type to be coalesced atomically, that is, with  "replace" semantics, instead of its
+// default coalesce semantics. When 2 non-zero-values of this type are coalesced, the second value is returned as is.
 func WithAtomicType(t reflect.Type) MainCoalescerOption {
 	return WithTypeCoalescer(t, &defaultCoalescer{})
 }

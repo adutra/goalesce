@@ -71,6 +71,16 @@ func TestWithFieldCoalescer(t *testing.T) {
 	assert.Equal(t, expected, c.fieldCoalescers)
 }
 
+func TestWithAtomicField(t *testing.T) {
+	type User struct {
+		Id string
+	}
+	c := &structCoalescer{}
+	WithAtomicField(reflect.TypeOf(User{}), "Id")(c)
+	expected := map[reflect.Type]map[string]Coalescer{reflect.TypeOf(User{}): {"Id": &defaultCoalescer{}}}
+	assert.Equal(t, expected, c.fieldCoalescers)
+}
+
 func Test_structCoalescer_Coalesce(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		type foo struct {
@@ -316,6 +326,18 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 			got, err := coalescer.Coalesce(reflect.ValueOf(foo{Ints: []int{1, 2}}), reflect.ValueOf(foo{Ints: []int{2, 3}}))
 			require.NoError(t, err)
 			assert.Equal(t, foo{Ints: []int{1, 2, 2, 3}}, got.Interface())
+		})
+		t.Run("atomic field", func(t *testing.T) {
+			type foo struct {
+				Ints map[int]string
+			}
+			coalescer := NewStructCoalescer(WithAtomicField(reflect.TypeOf(foo{}), "Ints"))
+			got, err := coalescer.Coalesce(
+				reflect.ValueOf(foo{Ints: map[int]string{1: "abc"}}),
+				reflect.ValueOf(foo{Ints: map[int]string{1: "def"}}),
+			)
+			require.NoError(t, err)
+			assert.Equal(t, foo{Ints: map[int]string{1: "def"}}, got.Interface())
 		})
 	})
 	t.Run("tag errors", func(t *testing.T) {

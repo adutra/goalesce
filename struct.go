@@ -59,6 +59,12 @@ func WithFieldCoalescer(t reflect.Type, field string, coalescer Coalescer) Struc
 	}
 }
 
+// WithAtomicField causes the given field to be coalesced atomically, that is, with  "replace" semantics, instead of its
+// default coalesce semantics. When 2 non-zero-values of this field are coalesced, the second value is returned as is.
+func WithAtomicField(t reflect.Type, field string) StructCoalescerOption {
+	return WithFieldCoalescer(t, field, NewDefaultCoalescer())
+}
+
 type structCoalescer struct {
 	fallback        Coalescer
 	fieldCoalescers map[reflect.Type]map[string]Coalescer

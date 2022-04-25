@@ -77,15 +77,24 @@ func WithPointerCoalescer(coalescer Coalescer) MainCoalescerOption {
 	}
 }
 
+// WithInterfaceCoalescer changes the coalescer used for interfaces. Use this to customize the coalescing of interfaces.
+// See NewInterfaceCoalescer for more information.
+func WithInterfaceCoalescer(coalescer Coalescer) MainCoalescerOption {
+	return func(c *mainCoalescer) {
+		c.interfaceCoalescer = coalescer
+	}
+}
+
 // NewMainCoalescer creates a new main coalescer with the given options. This is the Coalescer used by the Coalesce
 // function. The main coalescer always sets itself as the fallback coalescer for all its delegating coalescers.
 func NewMainCoalescer(opts ...MainCoalescerOption) *mainCoalescer {
 	c := &mainCoalescer{
-		defaultCoalescer: NewDefaultCoalescer(),
-		sliceCoalescer:   NewSliceCoalescer(),
-		mapCoalescer:     NewMapCoalescer(),
-		structCoalescer:  NewStructCoalescer(),
-		pointerCoalescer: NewPointerCoalescer(),
+		defaultCoalescer:   NewDefaultCoalescer(),
+		sliceCoalescer:     NewSliceCoalescer(),
+		mapCoalescer:       NewMapCoalescer(),
+		structCoalescer:    NewStructCoalescer(),
+		pointerCoalescer:   NewPointerCoalescer(),
+		interfaceCoalescer: NewInterfaceCoalescer(),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -95,12 +104,13 @@ func NewMainCoalescer(opts ...MainCoalescerOption) *mainCoalescer {
 }
 
 type mainCoalescer struct {
-	defaultCoalescer Coalescer
-	pointerCoalescer Coalescer
-	mapCoalescer     Coalescer
-	structCoalescer  Coalescer
-	sliceCoalescer   Coalescer
-	typeCoalescers   map[reflect.Type]Coalescer
+	defaultCoalescer   Coalescer
+	pointerCoalescer   Coalescer
+	interfaceCoalescer Coalescer
+	mapCoalescer       Coalescer
+	structCoalescer    Coalescer
+	sliceCoalescer     Coalescer
+	typeCoalescers     map[reflect.Type]Coalescer
 }
 
 func (c *mainCoalescer) WithFallback(Coalescer) {
@@ -109,6 +119,7 @@ func (c *mainCoalescer) WithFallback(Coalescer) {
 	c.mapCoalescer.WithFallback(c)
 	c.structCoalescer.WithFallback(c)
 	c.pointerCoalescer.WithFallback(c)
+	c.interfaceCoalescer.WithFallback(c)
 	for _, coalescer := range c.typeCoalescers {
 		coalescer.WithFallback(c)
 	}
@@ -125,6 +136,8 @@ func (c *mainCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
 		return coalescer.Coalesce(v1, v2)
 	}
 	switch v1.Type().Kind() {
+	case reflect.Interface:
+		return c.interfaceCoalescer.Coalesce(v1, v2)
 	case reflect.Ptr:
 		return c.pointerCoalescer.Coalesce(v1, v2)
 	case reflect.Map:

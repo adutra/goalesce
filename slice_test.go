@@ -97,6 +97,20 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 		key := *elem.Int
 		return reflect.ValueOf(key)
 	}
+	barPtrInterfaceMergeFunc := func(i int, value reflect.Value) reflect.Value {
+		var elem *bar
+		if !value.IsNil() {
+			elem = value.Interface().(*bar)
+		}
+		if elem == nil {
+			elem = &bar{}
+		}
+		if elem.Int == nil {
+			elem.Int = new(int)
+		}
+		key := *elem.Int
+		return reflect.ValueOf(key)
+	}
 	tests := []struct {
 		name string
 		v1   interface{}
@@ -1099,7 +1113,202 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			[]SliceCoalescerOption{WithMergeByKey(reflect.PtrTo(reflect.TypeOf(bar{})), barPtrMergeFunc)},
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil, {Int: intPtr(4)}},
 		},
-
+		{
+			"[]interface{} zero",
+			[]interface{}(nil),
+			[]interface{}(nil),
+			nil,
+			[]interface{}(nil),
+		},
+		{
+			"[]interface{} mixed zero",
+			[]interface{}{},
+			[]interface{}(nil),
+			nil,
+			[]interface{}{},
+		},
+		{
+			"[]interface{} mixed zero 2",
+			[]interface{}(nil),
+			[]interface{}{},
+			nil,
+			[]interface{}{},
+		},
+		{
+			"[]interface{} empty",
+			[]interface{}{},
+			[]interface{}{},
+			nil,
+			[]interface{}{},
+		},
+		{
+			"[]interface{} mixed empty",
+			[]interface{}{&bar{Int: intPtr(1)}},
+			[]interface{}{},
+			nil,
+			[]interface{}{},
+		},
+		{
+			"[]interface{} mixed empty 2",
+			[]interface{}{},
+			[]interface{}{&bar{Int: intPtr(2)}},
+			nil,
+			[]interface{}{&bar{Int: intPtr(2)}},
+		},
+		{
+			"[]interface{} non empty",
+			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil},
+			[]interface{}{&bar{Int: intPtr(4)}, &bar{Int: nil}, nil},
+			nil,
+			[]interface{}{&bar{Int: intPtr(4)}, &bar{Int: nil}, nil},
+		},
+		{
+			"[]interface{} union zero",
+			[]interface{}(nil),
+			[]interface{}(nil),
+			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]interface{}(nil),
+		},
+		{
+			"[]interface{} union mixed zero",
+			[]interface{}{},
+			[]interface{}(nil),
+			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]interface{}{},
+		},
+		{
+			"[]interface{} union mixed zero 2",
+			[]interface{}(nil),
+			[]interface{}{},
+			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]interface{}{},
+		},
+		{
+			"[]interface{} union empty",
+			[]interface{}{},
+			[]interface{}{},
+			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]interface{}{},
+		},
+		{
+			"[]interface{} union mixed empty",
+			[]interface{}{&bar{Int: intPtr(1)}},
+			[]interface{}{},
+			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]interface{}{&bar{Int: intPtr(1)}},
+		},
+		{
+			"[]interface{} union mixed empty 2",
+			[]interface{}{},
+			[]interface{}{&bar{Int: intPtr(2)}},
+			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]interface{}{&bar{Int: intPtr(2)}},
+		},
+		{
+			"[]interface{} union non empty",
+			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil},
+			[]interface{}{&bar{Int: intPtr(2)}, &bar{Int: intPtr(4)}, &bar{Int: intPtr(5)}, nil},
+			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil, &bar{Int: intPtr(2)}, &bar{Int: intPtr(4)}, &bar{Int: intPtr(5)}},
+		},
+		{
+			"[]interface{} custom union zero",
+			[]interface{}(nil),
+			[]interface{}(nil),
+			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]interface{}(nil),
+		},
+		{
+			"[]interface{} custom union mixed zero",
+			[]interface{}{},
+			[]interface{}(nil),
+			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]interface{}{},
+		},
+		{
+			"[]interface{} custom union mixed zero 2",
+			[]interface{}(nil),
+			[]interface{}{},
+			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]interface{}{},
+		},
+		{
+			"[]interface{} custom union empty",
+			[]interface{}{},
+			[]interface{}{},
+			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]interface{}{},
+		},
+		{
+			"[]interface{} custom union mixed empty",
+			[]interface{}{&bar{Int: intPtr(1)}},
+			[]interface{}{},
+			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]interface{}{&bar{Int: intPtr(1)}},
+		},
+		{
+			"[]interface{} custom union mixed empty 2",
+			[]interface{}{},
+			[]interface{}{&bar{Int: intPtr(2)}},
+			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]interface{}{&bar{Int: intPtr(2)}},
+		},
+		{
+			"[]interface{} custom union non empty",
+			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil},
+			[]interface{}{&bar{Int: intPtr(2)}, &bar{Int: intPtr(4)}, &bar{Int: intPtr(5)}, nil},
+			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil, &bar{Int: intPtr(2)}, &bar{Int: intPtr(4)}, &bar{Int: intPtr(5)}},
+		},
+		{
+			"[]interface{} merge key zero",
+			[]interface{}(nil),
+			[]interface{}(nil),
+			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]interface{}(nil),
+		},
+		{
+			"[]interface{} merge key mixed zero",
+			[]interface{}{},
+			[]interface{}(nil),
+			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]interface{}{},
+		},
+		{
+			"[]interface{} merge key mixed zero 2",
+			[]interface{}(nil),
+			[]interface{}{},
+			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]interface{}{},
+		},
+		{
+			"[]interface{} merge key empty",
+			[]interface{}{},
+			[]interface{}{},
+			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]interface{}{},
+		},
+		{
+			"[]interface{} merge key mixed empty",
+			[]interface{}{&bar{Int: intPtr(1)}},
+			[]interface{}{},
+			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]interface{}{&bar{Int: intPtr(1)}},
+		},
+		{
+			"[]interface{} merge key mixed empty 2",
+			[]interface{}{},
+			[]interface{}{&bar{Int: intPtr(2)}},
+			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]interface{}{&bar{Int: intPtr(2)}},
+		},
+		{
+			"[]interface{} merge key non empty",
+			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil},
+			[]interface{}{&bar{Int: intPtr(2)}, &bar{Int: intPtr(4)}, &bar{Int: nil}, nil},
+			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil, &bar{Int: intPtr(4)}},
+		},
 		{
 			"[]bar default merge by index zero",
 			[]bar(nil),
@@ -1336,9 +1545,8 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 		assert.EqualError(t, err, "values have wrong kind: expected slice, got int")
 	})
 	t.Run("fallback error", func(t *testing.T) {
-		m := new(mockCoalescer)
+		m := newMockCoalescer(t)
 		m.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.Value{}, errors.New("fake"))
-		m.Test(t)
 		coalescer := NewSliceCoalescer(WithDefaultSetUnion())
 		coalescer.WithFallback(m)
 		_, err := coalescer.Coalesce(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{2}))

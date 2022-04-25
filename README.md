@@ -23,6 +23,7 @@ When called with no options, the function uses the following coalescing algorith
 - If both values are [zero-values] for the type, return the type's zero-value.
 - If one value is a zero-value for the type, return the other value.
 - Otherwise, the values are coalesced using the following rules:
+  - If both values are interfaces of same underlying types, coalesce the underlying values.
   - If both values are pointers, coalesce the values pointed to.
   - If both values are maps, coalesce the maps recursively, key by key.
   - If both values are structs, coalesce the structs recursively, field by field.

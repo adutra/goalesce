@@ -41,9 +41,8 @@ func TestNewStructCoalescer(t *testing.T) {
 		type foo struct {
 			Int int
 		}
-		m := &mockCoalescer{}
+		m := newMockCoalescer(t)
 		m.On("WithFallback", mock.Anything).Return()
-		m.Test(t)
 		actual := NewStructCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "Int", m))
 		assert.Equal(
 			t,
@@ -163,10 +162,28 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 				bar{},
 			},
 			{
-				"field interface",
+				"field interface different types",
 				bar{Interface: 1},
 				bar{Interface: "abc"},
 				bar{Interface: "abc"},
+			},
+			{
+				"field interface nil 1",
+				bar{Interface: &foo{Int: 1}},
+				bar{Interface: nil},
+				bar{Interface: &foo{Int: 1}},
+			},
+			{
+				"field interface nil 2",
+				bar{Interface: nil},
+				bar{Interface: &foo{Int: 1}},
+				bar{Interface: &foo{Int: 1}},
+			},
+			{
+				"field interface same types",
+				bar{Interface: &bar{Int: 1, Map: map[int]string{1: "a"}}},
+				bar{Interface: &bar{Int: 0, Map: map[int]string{2: "b"}}},
+				bar{Interface: &bar{Int: 1, Map: map[int]string{1: "a", 2: "b"}}},
 			},
 			{
 				"field map",
@@ -192,8 +209,8 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 				coalescer := NewStructCoalescer()
 				coalescer.WithFallback(NewMainCoalescer())
 				got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
-				assert.Equal(t, tt.want, got.Interface())
 				require.NoError(t, err)
+				assert.Equal(t, tt.want, got.Interface())
 			})
 		}
 	})
@@ -454,9 +471,8 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 		type foo struct {
 			Int int
 		}
-		m := new(mockCoalescer)
+		m := newMockCoalescer(t)
 		m.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.Value{}, errors.New("fake"))
-		m.Test(t)
 		coalescer := NewStructCoalescer()
 		coalescer.WithFallback(m)
 		_, err := coalescer.Coalesce(reflect.ValueOf(foo{Int: 1}), reflect.ValueOf(foo{Int: 2}))

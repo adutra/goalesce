@@ -181,9 +181,8 @@ func Test_pointerCoalescer_Coalesce(t *testing.T) {
 		assert.EqualError(t, err, "*goalesce.cycle: cycle detected")
 	})
 	t.Run("fallback error", func(t *testing.T) {
-		m := new(mockCoalescer)
+		m := newMockCoalescer(t)
 		m.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.Value{}, errors.New("fake"))
-		m.Test(t)
 		coalescer := NewPointerCoalescer()
 		coalescer.WithFallback(m)
 		_, err := coalescer.Coalesce(reflect.ValueOf(intPtr(1)), reflect.ValueOf(intPtr(2)))

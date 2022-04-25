@@ -286,6 +286,42 @@ func Test_mapCoalescer_Coalesce(t *testing.T) {
 			map[string][]*int{"a": {intPtr(1), intPtr(2)}, "c": nil},
 			map[string][]*int{"a": {intPtr(1), intPtr(2)}, "b": {intPtr(1)}, "c": nil},
 		},
+		{
+			"map[string]interface{} empty",
+			map[string]interface{}{},
+			map[string]interface{}{},
+			map[string]interface{}{},
+		},
+		{
+			"map[string]interface{} mixed empty",
+			map[string]interface{}{"a": &bar{intPtr(1)}},
+			map[string]interface{}{},
+			map[string]interface{}{"a": &bar{intPtr(1)}},
+		},
+		{
+			"map[string]interface{} mixed empty 2",
+			map[string]interface{}{},
+			map[string]interface{}{"b": &bar{intPtr(2)}},
+			map[string]interface{}{"b": &bar{intPtr(2)}},
+		},
+		{
+			"map[string]interface{} nested nils",
+			map[string]interface{}{"a": &bar{nil}, "b": nil},
+			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
+			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
+		},
+		{
+			"map[string]interface{} nested nils 2",
+			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
+			map[string]interface{}{"a": &bar{nil}, "b": nil},
+			map[string]interface{}{"a": &bar{nil}, "b": &bar{intPtr(2)}},
+		},
+		{
+			"map[string]interface{} non empty",
+			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
+			map[string]interface{}{"a": &bar{intPtr(2)}, "c": &bar{intPtr(2)}},
+			map[string]interface{}{"a": &bar{intPtr(2)}, "b": &bar{intPtr(2)}, "c": &bar{intPtr(2)}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -303,9 +339,8 @@ func Test_mapCoalescer_Coalesce(t *testing.T) {
 	})
 	t.Run("fallback error", func(t *testing.T) {
 		coalescer := NewMapCoalescer()
-		m := new(mockCoalescer)
+		m := newMockCoalescer(t)
 		m.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.Value{}, errors.New("fake"))
-		m.Test(t)
 		coalescer.WithFallback(m)
 		_, err := coalescer.Coalesce(reflect.ValueOf(map[string]int{"a": 2}), reflect.ValueOf(map[string]int{"a": 2}))
 		assert.EqualError(t, err, "fake")

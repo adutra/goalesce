@@ -25,6 +25,7 @@ func TestNewMainCoalescer(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		expected := &mainCoalescer{}
 		expected.defaultCoalescer = &defaultCoalescer{}
+		expected.interfaceCoalescer = &interfaceCoalescer{fallback: expected}
 		expected.pointerCoalescer = &pointerCoalescer{fallback: expected}
 		expected.mapCoalescer = &mapCoalescer{fallback: expected}
 		expected.structCoalescer = &structCoalescer{fallback: expected}
@@ -46,11 +47,11 @@ func TestNewMainCoalescer(t *testing.T) {
 		type foo struct {
 			Int int
 		}
-		m := &mockCoalescer{}
+		m := newMockCoalescer(t)
 		m.On("WithFallback", mock.Anything).Return()
-		m.Test(t)
 		expected := &mainCoalescer{}
 		expected.defaultCoalescer = &defaultCoalescer{}
+		expected.interfaceCoalescer = &interfaceCoalescer{fallback: expected}
 		expected.pointerCoalescer = &pointerCoalescer{fallback: expected}
 		expected.mapCoalescer = &mapCoalescer{fallback: expected}
 		expected.structCoalescer = &structCoalescer{fallback: expected}
@@ -87,6 +88,13 @@ func TestWithDefaultCoalescer(t *testing.T) {
 	m := &mockCoalescer{}
 	WithDefaultCoalescer(m)(c)
 	assert.Equal(t, m, c.defaultCoalescer)
+}
+
+func TestWithInterfaceCoalescer(t *testing.T) {
+	c := &mainCoalescer{}
+	m := &mockCoalescer{}
+	WithInterfaceCoalescer(m)(c)
+	assert.Equal(t, m, c.interfaceCoalescer)
 }
 
 func TestWithMapCoalescer(t *testing.T) {

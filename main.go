@@ -27,6 +27,27 @@ func WithAtomicType(t reflect.Type) MainCoalescerOption {
 	return WithTypeCoalescer(t, &defaultCoalescer{})
 }
 
+// WithTrileans causes all boolean pointers to be coalesced using a three-valued logic, instead of their default
+// coalesce semantics. When this is enabled, boolean pointers will behave as if they were "trileans", that is, a type
+// with 3 possible values: nil (its zero-value), false and true (contrary to booleans, with trileans false is NOT a
+// zero-value).
+// The coalescing of trileans obeys the following rules:
+//   v1    v2    coalesced
+//   nil   nil   nil
+//   nil   false false
+//   nil   true  true
+//   false nil   false
+//   false false false
+//   false true  true
+//   true  nil   true
+//   true  false false
+//   true  true  true
+// The biggest difference with regular boolean pointers is that Coalesce(&true, &false) will return &true, while with
+// trileans, it will return &false.
+func WithTrileans() MainCoalescerOption {
+	return WithAtomicType(reflect.PtrTo(reflect.TypeOf(false)))
+}
+
 // WithTypeCoalescer will defer the coalescing of the given type to the given custom coalescer.
 func WithTypeCoalescer(t reflect.Type, coalescer Coalescer) MainCoalescerOption {
 	return func(c *mainCoalescer) {

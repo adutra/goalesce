@@ -75,6 +75,13 @@ func TestWithAtomicType(t *testing.T) {
 	assert.Equal(t, expected, c.typeCoalescers)
 }
 
+func TestWithTrileans(t *testing.T) {
+	c := &mainCoalescer{}
+	WithTrileans()(c)
+	expected := map[reflect.Type]Coalescer{reflect.PtrTo(reflect.TypeOf(false)): &defaultCoalescer{}}
+	assert.Equal(t, expected, c.typeCoalescers)
+}
+
 func TestWithTypeCoalescer(t *testing.T) {
 	c := &mainCoalescer{}
 	m := &mockCoalescer{}

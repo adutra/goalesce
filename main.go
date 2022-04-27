@@ -150,11 +150,11 @@ func (c *mainCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
 	if err := checkTypesMatch(v1, v2); err != nil {
 		return reflect.Value{}, err
 	}
-	if value, done := checkZero(v1, v2); done {
-		return value, nil
-	}
 	if coalescer, found := c.typeCoalescers[v1.Type()]; found {
 		return coalescer.Coalesce(v1, v2)
+	}
+	if value, done := checkZero(v1, v2); done {
+		return value, nil
 	}
 	switch v1.Type().Kind() {
 	case reflect.Interface:

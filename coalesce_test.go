@@ -281,6 +281,10 @@ func TestCoalesce(t *testing.T) {
 		// without trileans: Coalesce(true, false) = true
 		{"trilean true false", boolPtr(true), boolPtr(false), nil, boolPtr(true)},
 		{"trilean true true", boolPtr(true), boolPtr(true), []MainCoalescerOption{WithTrileans()}, boolPtr(true)},
+		{"type coalescer zero values", "", "", []MainCoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer{})}, "ZERO!ZERO!"},
+		{"type coalescer zero value 1", "abc", "", []MainCoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer{})}, "abcZERO!"},
+		{"type coalescer zero value 2", "", "def", []MainCoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer{})}, "ZERO!def"},
+		{"type coalescer non-zero values", "abc", "def", []MainCoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer{})}, "abcdef"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -301,3 +305,17 @@ func TestMustCoalesce(t *testing.T) {
 		MustCoalesce(1, " abc")
 	})
 }
+
+type weirdStringCoalescer struct{}
+
+func (w weirdStringCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
+	if v1.IsZero() {
+		v1 = reflect.ValueOf("ZERO!")
+	}
+	if v2.IsZero() {
+		v2 = reflect.ValueOf("ZERO!")
+	}
+	return reflect.ValueOf(v1.Interface().(string) + v2.Interface().(string)), nil
+}
+
+func (w weirdStringCoalescer) WithFallback(_ Coalescer) {}

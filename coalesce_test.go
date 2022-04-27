@@ -269,6 +269,18 @@ func TestCoalesce(t *testing.T) {
 				WithTypeCoalescer(reflect.TypeOf([]*foo{}), &defaultCoalescer{})}, // will prevail
 			[]*foo{{Int: 3}, {Int: 4}, {Int: 5}},
 		},
+		{"trilean nil nil", (*bool)(nil), (*bool)(nil), []MainCoalescerOption{WithTrileans()}, (*bool)(nil)},
+		{"trilean nil false", (*bool)(nil), boolPtr(false), []MainCoalescerOption{WithTrileans()}, boolPtr(false)},
+		{"trilean nil true", (*bool)(nil), boolPtr(true), []MainCoalescerOption{WithTrileans()}, boolPtr(true)},
+		{"trilean false nil", boolPtr(false), (*bool)(nil), []MainCoalescerOption{WithTrileans()}, boolPtr(false)},
+		{"trilean false false", boolPtr(false), boolPtr(false), []MainCoalescerOption{WithTrileans()}, boolPtr(false)},
+		{"trilean false true", boolPtr(false), boolPtr(true), []MainCoalescerOption{WithTrileans()}, boolPtr(true)},
+		{"trilean true nil", boolPtr(true), (*bool)(nil), []MainCoalescerOption{WithTrileans()}, boolPtr(true)},
+		// with trileans: Coalesce(true, false) = false
+		{"trilean true false", boolPtr(true), boolPtr(false), []MainCoalescerOption{WithTrileans()}, boolPtr(false)},
+		// without trileans: Coalesce(true, false) = true
+		{"trilean true false", boolPtr(true), boolPtr(false), nil, boolPtr(true)},
+		{"trilean true true", boolPtr(true), boolPtr(true), []MainCoalescerOption{WithTrileans()}, boolPtr(true)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

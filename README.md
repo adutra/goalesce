@@ -292,13 +292,13 @@ When the default struct coalescing behavior is not desired or sufficient, per-fi
 
 The struct tag `coalesceStrategy` allows to specify the following per-field strategies:
 
-| Strategy  | Valid on               | Effect                              |
-|-----------|------------------------|-------------------------------------|
-| `atomic` | Any field              | Applies "atomic" semantics.        |
-| `union`   | Slice fields           | Applies "set-union" semantics.      |
-| `append`  | Slice fields           | Applies "list-append" semantics.    |   
-| `index`   | Slice fields           | Applies "merge-by-index" semantics. |   
-| `merge`   | Slice of struct fields | Applies "merge-by-key" semantics.   |   
+| Strategy   | Valid on               | Effect                              |
+|------------|------------------------|-------------------------------------|
+| `atomic`   | Any field              | Applies "atomic" semantics.         |
+| `union`    | Slice fields           | Applies "set-union" semantics.      |
+| `append`   | Slice fields           | Applies "list-append" semantics.    |   
+| `index`    | Slice fields           | Applies "merge-by-index" semantics. |   
+| `merge`    | Slice of struct fields | Applies "merge-by-key" semantics.   |   
 
 With `merge`, a merge key must also be provided in another struct tag: `coalesceMergeKey`. The merge key _must_ be the
 name of a field in the slice's struct element type.

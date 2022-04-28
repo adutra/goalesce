@@ -17,12 +17,10 @@ package goalesce
 import (
 	"fmt"
 	"reflect"
+	"strings"
 )
 
-const (
-	CoalesceStrategyTag = "coalesceStrategy"
-	CoalesceMergeKeyTag = "coalesceMergeKey"
-)
+const CoalesceStrategyTag = "goalesce"
 
 const (
 	CoalesceStrategyAtomic = "atomic"
@@ -123,20 +121,18 @@ func (c *structCoalescer) fieldCoalescerFromTag(structType reflect.Type, field r
 	if !found {
 		return nil, nil
 	}
-	switch coalesceStrategy {
-	case CoalesceStrategyAtomic:
-		return &atomicCoalescer{}, nil
-	case CoalesceStrategyAppend:
+	if coalesceStrategy == CoalesceStrategyAtomic {
+		return NewAtomicCoalescer(), nil
+	} else if coalesceStrategy == CoalesceStrategyAppend {
 		return c.appendFieldCoalescer(structType, field)
-	case CoalesceStrategyUnion:
+	} else if coalesceStrategy == CoalesceStrategyUnion {
 		return c.unionFieldCoalescer(structType, field)
-	case CoalesceStrategyIndex:
+	} else if coalesceStrategy == CoalesceStrategyIndex {
 		return c.indexFieldCoalescer(structType, field)
-	case CoalesceStrategyMerge:
-		return c.mergeFieldCoalescer(structType, field)
-	default:
-		return nil, fmt.Errorf("field %s.%s: unknown coalesce strategy: %s", structType.String(), field.Name, coalesceStrategy)
+	} else if strings.HasPrefix(coalesceStrategy, CoalesceStrategyMerge) {
+		return c.mergeFieldCoalescer(structType, field, coalesceStrategy)
 	}
+	return nil, fmt.Errorf("field %s.%s: unknown coalesce strategy: %s", structType.String(), field.Name, coalesceStrategy)
 }
 
 func (c *structCoalescer) appendFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
@@ -166,13 +162,16 @@ func (c *structCoalescer) indexFieldCoalescer(structType reflect.Type, field ref
 	}, nil
 }
 
-func (c *structCoalescer) mergeFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
+func (c *structCoalescer) mergeFieldCoalescer(structType reflect.Type, field reflect.StructField, strategy string) (Coalescer, error) {
 	if field.Type.Kind() != reflect.Slice {
 		return nil, fmt.Errorf("field %s.%s: merge strategy is only supported for slices", structType.String(), field.Name)
 	}
-	key, found := field.Tag.Lookup(CoalesceMergeKeyTag)
-	if !found {
-		return nil, fmt.Errorf("field %s.%s: %s struct tag is required for %s strategy", structType.String(), field.Name, CoalesceMergeKeyTag, CoalesceStrategyMerge)
+	var key string
+	if len(strategy) >= len(CoalesceStrategyMerge)+1 {
+		key = strategy[len(CoalesceStrategyMerge)+1:]
+	}
+	if key == "" {
+		return nil, fmt.Errorf("field %s.%s: %s strategy must be followed by a comma and the merge key", structType.String(), field.Name, CoalesceStrategyMerge)
 	}
 	elemType := indirect(field.Type.Elem())
 	if elemType.Kind() != reflect.Struct {

@@ -93,7 +93,7 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 			unexported int
 			Interface  interface{}
 			Map        map[int]string
-			MapAtomic  map[int]string `coalesceStrategy:"atomic"`
+			MapAtomic  map[int]string `goalesce:"atomic"`
 		}
 		tests := []struct {
 			name string
@@ -226,18 +226,18 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 		}
 		type bar struct {
 			Ints            []int
-			IntsAtomic      []int `coalesceStrategy:"atomic"`
-			IntsUnion       []int `coalesceStrategy:"union"`
-			IntsAppend      []int `coalesceStrategy:"append"`
-			IntsIndex       []int `coalesceStrategy:"index"`
+			IntsAtomic      []int `goalesce:"atomic"`
+			IntsUnion       []int `goalesce:"union"`
+			IntsAppend      []int `goalesce:"append"`
+			IntsIndex       []int `goalesce:"index"`
 			Foos            []foo
-			FoosAtomic      []foo    `coalesceStrategy:"atomic"`
-			FoosUnion       []foo    `coalesceStrategy:"union"`
-			FoosAppend      []foo    `coalesceStrategy:"append"`
-			FoosIndex       []foo    `coalesceStrategy:"index"`
-			FoosMergeKey    []foo    `coalesceStrategy:"merge" coalesceMergeKey:"Int"`
-			FooPtrsMergeKey []*foo   `coalesceStrategy:"merge" coalesceMergeKey:"IntPtr"`
-			NestedSlice     []nested `coalesceStrategy:"merge" coalesceMergeKey:"Key"`
+			FoosAtomic      []foo    `goalesce:"atomic"`
+			FoosUnion       []foo    `goalesce:"union"`
+			FoosAppend      []foo    `goalesce:"append"`
+			FoosIndex       []foo    `goalesce:"index"`
+			FoosMergeKey    []foo    `goalesce:"merge,Int"`
+			FooPtrsMergeKey []*foo   `goalesce:"merge,IntPtr"`
+			NestedSlice     []nested `goalesce:"merge,Key"`
 		}
 		tests := []struct {
 			name string
@@ -362,29 +362,32 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 			Int int
 		}
 		type unknownStrategy struct {
-			Ints []int `coalesceStrategy:"unknown"`
+			Ints []int `goalesce:"unknown"`
 		}
 		type invalidAppend struct {
-			Int int `coalesceStrategy:"append"`
+			Int int `goalesce:"append"`
 		}
 		type invalidUnion struct {
-			Int int `coalesceStrategy:"union"`
+			Int int `goalesce:"union"`
 		}
 		type invalidIndex struct {
-			Int int `coalesceStrategy:"index"`
+			Int int `goalesce:"index"`
 		}
 		type invalidMerge struct {
-			Int int `coalesceStrategy:"merge"`
+			Int int `goalesce:"merge"`
 		}
 		type missingKey struct {
-			Ints []int `coalesceStrategy:"merge"`
+			Ints []int `goalesce:"merge"`
+		}
+		type missingKey2 struct {
+			Ints []int `goalesce:"merge,"`
 		}
 		type wrongElemType struct {
-			Ints []int `coalesceStrategy:"merge" coalesceMergeKey:"irrelevant"`
+			Ints []int `goalesce:"merge,irrelevant"`
 		}
 		type unknownField struct {
-			Foos    []foo  `coalesceStrategy:"merge" coalesceMergeKey:"unknown"`
-			FooPtrs []*foo `coalesceStrategy:"merge" coalesceMergeKey:"unknown"`
+			Foos    []foo  `goalesce:"merge,unknown"`
+			FooPtrs []*foo `goalesce:"merge,unknown"`
 		}
 		tests := []struct {
 			name string
@@ -426,7 +429,13 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 				"missing merge key",
 				missingKey{Ints: []int{1}},
 				missingKey{Ints: []int{2}},
-				"field goalesce.missingKey.Ints: coalesceMergeKey struct tag is required for merge strategy",
+				"field goalesce.missingKey.Ints: merge strategy must be followed by a comma and the merge key",
+			},
+			{
+				"missing merge key 2",
+				missingKey2{Ints: []int{1}},
+				missingKey2{Ints: []int{2}},
+				"field goalesce.missingKey2.Ints: merge strategy must be followed by a comma and the merge key",
 			},
 			{
 				"wrong element type",

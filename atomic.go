@@ -16,18 +16,18 @@ package goalesce
 
 import "reflect"
 
-// NewDefaultCoalescer returns a coalescer that always applies "replace" semantics when coalescing. In other words, this
+// NewAtomicCoalescer returns a coalescer that always applies "atomic" semantics when coalescing. In other words, this
 // coalescer does not coalesce anything, it simply returns v1 if v2 is the zero-value for its type, and v2 otherwise. It
 // is suitable for coalescing scalar types mostly.
-func NewDefaultCoalescer() Coalescer {
-	return &defaultCoalescer{}
+func NewAtomicCoalescer() Coalescer {
+	return &atomicCoalescer{}
 }
 
-type defaultCoalescer struct{}
+type atomicCoalescer struct{}
 
-func (c *defaultCoalescer) WithFallback(Coalescer) {}
+func (c *atomicCoalescer) WithFallback(Coalescer) {}
 
-func (c *defaultCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
+func (c *atomicCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
 	if v2.IsZero() {
 		return v1, nil
 	}

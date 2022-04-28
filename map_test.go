@@ -26,7 +26,7 @@ import (
 func TestNewMapCoalescer(t *testing.T) {
 	t.Run("no opts", func(t *testing.T) {
 		got := NewMapCoalescer()
-		assert.Equal(t, &mapCoalescer{fallback: &defaultCoalescer{}}, got)
+		assert.Equal(t, &mapCoalescer{fallback: &atomicCoalescer{}}, got)
 	})
 	t.Run("with generic option", func(t *testing.T) {
 		var passed *mapCoalescer
@@ -34,7 +34,7 @@ func TestNewMapCoalescer(t *testing.T) {
 			passed = c
 		}
 		returned := NewMapCoalescer(opt)
-		assert.Equal(t, &mapCoalescer{fallback: &defaultCoalescer{}}, returned)
+		assert.Equal(t, &mapCoalescer{fallback: &atomicCoalescer{}}, returned)
 		assert.Equal(t, returned, passed)
 	})
 }

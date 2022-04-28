@@ -22,10 +22,12 @@ import (
 // option, but this could change in the future.
 type InterfaceCoalescerOption func(c *interfaceCoalescer)
 
-// NewInterfaceCoalescer creates a new Coalescer for interface types.
+// NewInterfaceCoalescer creates a new Coalescer for interface types. If both values to coalesce are non-nil, the
+// returned coalescer will coalesce the interfaces' underlying values, if they are of the same type; otherwise, it will
+// apply atomic semantics and return the second value.
 func NewInterfaceCoalescer(opts ...InterfaceCoalescerOption) Coalescer {
 	c := &interfaceCoalescer{
-		fallback: &defaultCoalescer{},
+		fallback: &atomicCoalescer{},
 	}
 	for _, opt := range opts {
 		opt(c)

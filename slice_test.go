@@ -26,7 +26,7 @@ import (
 func TestNewSliceCoalescer(t *testing.T) {
 	t.Run("no opts", func(t *testing.T) {
 		got := NewSliceCoalescer()
-		assert.Equal(t, &sliceCoalescer{defaultCoalescer: &defaultCoalescer{}}, got)
+		assert.Equal(t, &sliceCoalescer{defaultCoalescer: &atomicCoalescer{}}, got)
 	})
 	t.Run("with generic option", func(t *testing.T) {
 		var passed *sliceCoalescer
@@ -34,7 +34,7 @@ func TestNewSliceCoalescer(t *testing.T) {
 			passed = c
 		}
 		returned := NewSliceCoalescer(opt)
-		assert.Equal(t, &sliceCoalescer{defaultCoalescer: &defaultCoalescer{}}, returned)
+		assert.Equal(t, &sliceCoalescer{defaultCoalescer: &atomicCoalescer{}}, returned)
 		assert.Equal(t, returned, passed)
 	})
 	t.Run("with default union", func(t *testing.T) {
@@ -47,12 +47,12 @@ func TestNewSliceCoalescer(t *testing.T) {
 	})
 	t.Run("with append", func(t *testing.T) {
 		got := NewSliceCoalescer(WithListAppend(reflect.TypeOf("")))
-		assert.Equal(t, &defaultCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
+		assert.Equal(t, &atomicCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
 		assert.Equal(t, &sliceAppendCoalescer{}, got.(*sliceCoalescer).elemCoalescers[reflect.TypeOf("")])
 	})
 	t.Run("with merge by union", func(t *testing.T) {
 		got := NewSliceCoalescer(WithSetUnion(reflect.TypeOf(0)))
-		assert.Equal(t, &defaultCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
+		assert.Equal(t, &atomicCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
 		assert.IsType(t, &sliceMergeCoalescer{}, got.(*sliceCoalescer).elemCoalescers[reflect.TypeOf(0)])
 	})
 	t.Run("with merge by field", func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestNewSliceCoalescer(t *testing.T) {
 			Int int
 		}
 		got := NewSliceCoalescer(WithMergeByField(reflect.TypeOf(foo{}), "Int"))
-		assert.Equal(t, &defaultCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
+		assert.Equal(t, &atomicCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
 		assert.IsType(t, &sliceMergeCoalescer{}, got.(*sliceCoalescer).elemCoalescers[reflect.TypeOf(foo{})])
 	})
 	t.Run("with merge by key", func(t *testing.T) {
@@ -70,7 +70,7 @@ func TestNewSliceCoalescer(t *testing.T) {
 		got := NewSliceCoalescer(WithMergeByKey(reflect.TypeOf(foo{}), func(_ int, value reflect.Value) reflect.Value {
 			return reflect.ValueOf(value.Interface().(foo).Int)
 		}))
-		assert.Equal(t, &defaultCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
+		assert.Equal(t, &atomicCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
 		assert.IsType(t, &sliceMergeCoalescer{}, got.(*sliceCoalescer).elemCoalescers[reflect.TypeOf(foo{})])
 	})
 }

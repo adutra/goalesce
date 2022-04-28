@@ -26,7 +26,7 @@ import (
 func TestNewPointerCoalescer(t *testing.T) {
 	t.Run("no opts", func(t *testing.T) {
 		got := NewPointerCoalescer()
-		assert.Equal(t, &pointerCoalescer{fallback: &defaultCoalescer{}}, got)
+		assert.Equal(t, &pointerCoalescer{fallback: &atomicCoalescer{}}, got)
 	})
 	t.Run("with generic option", func(t *testing.T) {
 		var passed *pointerCoalescer
@@ -34,13 +34,13 @@ func TestNewPointerCoalescer(t *testing.T) {
 			passed = c
 		}
 		returned := NewPointerCoalescer(opt)
-		assert.Equal(t, &pointerCoalescer{fallback: &defaultCoalescer{}}, returned)
+		assert.Equal(t, &pointerCoalescer{fallback: &atomicCoalescer{}}, returned)
 		assert.Equal(t, returned, passed)
 	})
 	t.Run("with error on cycle", func(t *testing.T) {
 		expected := &pointerCoalescer{
 			onCycleReturnError: true,
-			fallback:           &defaultCoalescer{},
+			fallback:           &atomicCoalescer{},
 		}
 		actual := NewPointerCoalescer(WithOnCycleReturnError())
 		assert.Equal(t, expected, actual)

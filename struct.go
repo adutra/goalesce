@@ -25,11 +25,11 @@ const (
 )
 
 const (
-	CoalesceStrategyReplace = "replace"
-	CoalesceStrategyAppend  = "append"
-	CoalesceStrategyUnion   = "union"
-	CoalesceStrategyIndex   = "index"
-	CoalesceStrategyMerge   = "merge"
+	CoalesceStrategyAtomic = "atomic"
+	CoalesceStrategyAppend = "append"
+	CoalesceStrategyUnion  = "union"
+	CoalesceStrategyIndex  = "index"
+	CoalesceStrategyMerge  = "merge"
 )
 
 // StructCoalescerOption is an option to be passed to NewStructCoalescer.
@@ -38,7 +38,7 @@ type StructCoalescerOption func(c *structCoalescer)
 // NewStructCoalescer creates a new Coalescer for structs.
 func NewStructCoalescer(opts ...StructCoalescerOption) Coalescer {
 	c := &structCoalescer{
-		fallback: &defaultCoalescer{},
+		fallback: &atomicCoalescer{},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -59,10 +59,10 @@ func WithFieldCoalescer(t reflect.Type, field string, coalescer Coalescer) Struc
 	}
 }
 
-// WithAtomicField causes the given field to be coalesced atomically, that is, with  "replace" semantics, instead of its
+// WithAtomicField causes the given field to be coalesced atomically, that is, with  "atomic" semantics, instead of its
 // default coalesce semantics. When 2 non-zero-values of this field are coalesced, the second value is returned as is.
 func WithAtomicField(t reflect.Type, field string) StructCoalescerOption {
-	return WithFieldCoalescer(t, field, NewDefaultCoalescer())
+	return WithFieldCoalescer(t, field, NewAtomicCoalescer())
 }
 
 type structCoalescer struct {
@@ -124,8 +124,8 @@ func (c *structCoalescer) fieldCoalescerFromTag(structType reflect.Type, field r
 		return nil, nil
 	}
 	switch coalesceStrategy {
-	case CoalesceStrategyReplace:
-		return &defaultCoalescer{}, nil
+	case CoalesceStrategyAtomic:
+		return &atomicCoalescer{}, nil
 	case CoalesceStrategyAppend:
 		return c.appendFieldCoalescer(structType, field)
 	case CoalesceStrategyUnion:

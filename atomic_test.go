@@ -44,8 +44,8 @@ func Test_defaultCoalescer_Coalesce(t *testing.T) {
 		},
 		{
 			name: "int v2 zero",
-			v2:   1,
-			v1:   0,
+			v1:   1,
+			v2:   0,
 			want: 1,
 		},
 		{
@@ -68,8 +68,8 @@ func Test_defaultCoalescer_Coalesce(t *testing.T) {
 		},
 		{
 			name: "*int v2 zero",
-			v2:   intPtr(0),
-			v1:   (*int)(nil),
+			v1:   intPtr(0),
+			v2:   (*int)(nil),
 			want: intPtr(0),
 		},
 		{
@@ -92,8 +92,8 @@ func Test_defaultCoalescer_Coalesce(t *testing.T) {
 		},
 		{
 			name: "string v2 empty",
-			v2:   "a",
-			v1:   "",
+			v1:   "a",
+			v2:   "",
 			want: "a",
 		},
 		{
@@ -116,8 +116,8 @@ func Test_defaultCoalescer_Coalesce(t *testing.T) {
 		},
 		{
 			name: "*string v2 empty",
-			v2:   stringPtr(""),
-			v1:   (*string)(nil),
+			v1:   stringPtr(""),
+			v2:   (*string)(nil),
 			want: stringPtr(""),
 		},
 		{
@@ -140,8 +140,8 @@ func Test_defaultCoalescer_Coalesce(t *testing.T) {
 		},
 		{
 			name: "bool v2 false",
-			v2:   true,
-			v1:   false,
+			v1:   true,
+			v2:   false,
 			want: true,
 		},
 		{
@@ -151,28 +151,28 @@ func Test_defaultCoalescer_Coalesce(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "*bool both false",
+			name: "*bool both nil",
 			v1:   (*bool)(nil),
 			v2:   (*bool)(nil),
 			want: (*bool)(nil),
 		},
 		{
-			name: "*bool v1 false",
+			name: "*bool v1 nil",
 			v1:   (*bool)(nil),
 			v2:   boolPtr(false),
 			want: boolPtr(false),
 		},
 		{
-			name: "*bool v2 false",
-			v2:   boolPtr(false),
-			v1:   (*bool)(nil),
+			name: "*bool v2 nil",
+			v1:   boolPtr(false),
+			v2:   (*bool)(nil),
 			want: boolPtr(false),
 		},
 		{
-			name: "*bool none false",
+			name: "*bool none nil",
 			v1:   boolPtr(true),
 			v2:   boolPtr(false),
-			want: boolPtr(false),
+			want: boolPtr(false), // trilean semantics
 		},
 		{
 			name: "foo both zero",
@@ -188,8 +188,8 @@ func Test_defaultCoalescer_Coalesce(t *testing.T) {
 		},
 		{
 			name: "foo v2 zero",
-			v2:   foo{1},
-			v1:   foo{},
+			v1:   foo{1},
+			v2:   foo{},
 			want: foo{1},
 		},
 		{
@@ -212,8 +212,8 @@ func Test_defaultCoalescer_Coalesce(t *testing.T) {
 		},
 		{
 			name: "*foo v2 zero",
-			v2:   &foo{},
-			v1:   (*foo)(nil),
+			v1:   &foo{},
+			v2:   (*foo)(nil),
 			want: &foo{},
 		},
 		{
@@ -225,7 +225,7 @@ func Test_defaultCoalescer_Coalesce(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &defaultCoalescer{}
+			c := &atomicCoalescer{}
 			got, err := c.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())

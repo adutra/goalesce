@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,21 +22,21 @@ import (
 //
 // When called with no options, the function uses the following default algorithm:
 //
-//   - If both values are nil, return nil.
-//   - If one value is nil, return the other value.
-//   - If both values are zero-values for the type, return the type's zero-value.
-//   - If one value is a zero-value for the type, return the other value.
-//   - Otherwise, the values are coalesced using the following rules:
-//     - If both values are interfaces of same underlying types, coalesce the underlying values.
-//     - If both values are pointers, coalesce the values pointed to.
-//     - If both values are maps, coalesce the maps recursively, key by key.
-//     - If both values are structs, coalesce the structs recursively, field by field.
-//     - For other types (including slices), return the second value ("replace" semantics)
+//  - If both values are nil, return nil.
+//  - If one value is nil, return the other value.
+//  - If both values are zero-values for the type, return the type's zero-value.
+//  - If one value is a zero-value for the type, return the other value.
+//  - Otherwise, the values are coalesced using the following rules:
+//    - If both values are interfaces of same underlying types, coalesce the underlying values.
+//    - If both values are pointers, coalesce the values pointed to.
+//    - If both values are maps, coalesce the maps recursively, key by key.
+//    - If both values are structs, coalesce the structs recursively, field by field.
+//    - For other types (including slices), return the second value ("atomic" semantics)
 //
 // The function never modifies its inputs. It may return one of the (unmodified) inputs as the coalesced value, but
 // whenever changes to the inputs are required, the function always returns an entirely newly-allocated value.
 //
-// Note that by default, slices are coalesced with replace semantics, that is, the second slice overwrites the first one
+// Note that by default, slices are coalesced with atomic semantics, that is, the second slice overwrites the first one
 // completely. It is possible to change this behavior and use list-append, set-union, or merge-by semantics.
 // See SliceCoalescerOption.
 //

@@ -26,7 +26,7 @@ import (
 func TestNewInterfaceCoalescer(t *testing.T) {
 	t.Run("no opts", func(t *testing.T) {
 		got := NewInterfaceCoalescer()
-		assert.Equal(t, &interfaceCoalescer{fallback: &defaultCoalescer{}}, got)
+		assert.Equal(t, &interfaceCoalescer{fallback: &atomicCoalescer{}}, got)
 	})
 	t.Run("with generic option", func(t *testing.T) {
 		var passed *interfaceCoalescer
@@ -34,7 +34,7 @@ func TestNewInterfaceCoalescer(t *testing.T) {
 			passed = c
 		}
 		returned := NewInterfaceCoalescer(opt)
-		assert.Equal(t, &interfaceCoalescer{fallback: &defaultCoalescer{}}, returned)
+		assert.Equal(t, &interfaceCoalescer{fallback: &atomicCoalescer{}}, returned)
 		assert.Equal(t, returned, passed)
 	})
 }

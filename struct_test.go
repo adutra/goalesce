@@ -26,7 +26,7 @@ import (
 func TestNewStructCoalescer(t *testing.T) {
 	t.Run("no opts", func(t *testing.T) {
 		got := NewStructCoalescer()
-		assert.Equal(t, &structCoalescer{fallback: &defaultCoalescer{}}, got)
+		assert.Equal(t, &structCoalescer{fallback: &atomicCoalescer{}}, got)
 	})
 	t.Run("with generic option", func(t *testing.T) {
 		var passed *structCoalescer
@@ -34,7 +34,7 @@ func TestNewStructCoalescer(t *testing.T) {
 			passed = c
 		}
 		returned := NewStructCoalescer(opt)
-		assert.Equal(t, &structCoalescer{fallback: &defaultCoalescer{}}, returned)
+		assert.Equal(t, &structCoalescer{fallback: &atomicCoalescer{}}, returned)
 		assert.Equal(t, returned, passed)
 	})
 	t.Run("with field coalescer", func(t *testing.T) {
@@ -47,7 +47,7 @@ func TestNewStructCoalescer(t *testing.T) {
 		assert.Equal(
 			t,
 			&structCoalescer{
-				fallback: &defaultCoalescer{},
+				fallback: &atomicCoalescer{},
 				fieldCoalescers: map[reflect.Type]map[string]Coalescer{
 					reflect.TypeOf(foo{}): {"Int": m},
 				},
@@ -76,7 +76,7 @@ func TestWithAtomicField(t *testing.T) {
 	}
 	c := &structCoalescer{}
 	WithAtomicField(reflect.TypeOf(User{}), "Id")(c)
-	expected := map[reflect.Type]map[string]Coalescer{reflect.TypeOf(User{}): {"Id": &defaultCoalescer{}}}
+	expected := map[reflect.Type]map[string]Coalescer{reflect.TypeOf(User{}): {"Id": &atomicCoalescer{}}}
 	assert.Equal(t, expected, c.fieldCoalescers)
 }
 
@@ -93,7 +93,7 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 			unexported int
 			Interface  interface{}
 			Map        map[int]string
-			MapReplace map[int]string `coalesceStrategy:"replace"`
+			MapAtomic  map[int]string `coalesceStrategy:"atomic"`
 		}
 		tests := []struct {
 			name string
@@ -192,10 +192,10 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 				bar{Map: map[int]string{1: "a", 2: "a", 3: "b"}},
 			},
 			{
-				"field map replace",
-				bar{MapReplace: map[int]string{1: "a", 2: "b"}},
-				bar{MapReplace: map[int]string{2: "a", 3: "b"}},
-				bar{MapReplace: map[int]string{2: "a", 3: "b"}},
+				"field map atomic",
+				bar{MapAtomic: map[int]string{1: "a", 2: "b"}},
+				bar{MapAtomic: map[int]string{2: "a", 3: "b"}},
+				bar{MapAtomic: map[int]string{2: "a", 3: "b"}},
 			},
 			{
 				"non zeroes unexported",
@@ -226,12 +226,12 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 		}
 		type bar struct {
 			Ints            []int
-			IntsReplace     []int `coalesceStrategy:"replace"`
+			IntsAtomic      []int `coalesceStrategy:"atomic"`
 			IntsUnion       []int `coalesceStrategy:"union"`
 			IntsAppend      []int `coalesceStrategy:"append"`
 			IntsIndex       []int `coalesceStrategy:"index"`
 			Foos            []foo
-			FoosReplace     []foo    `coalesceStrategy:"replace"`
+			FoosAtomic      []foo    `coalesceStrategy:"atomic"`
 			FoosUnion       []foo    `coalesceStrategy:"union"`
 			FoosAppend      []foo    `coalesceStrategy:"append"`
 			FoosIndex       []foo    `coalesceStrategy:"index"`
@@ -252,10 +252,10 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 				bar{Ints: []int{2, 3}},
 			},
 			{
-				"slice ints replace",
-				bar{IntsReplace: []int{1, 2}},
-				bar{IntsReplace: []int{2, 3}},
-				bar{IntsReplace: []int{2, 3}},
+				"slice ints atomic",
+				bar{IntsAtomic: []int{1, 2}},
+				bar{IntsAtomic: []int{2, 3}},
+				bar{IntsAtomic: []int{2, 3}},
 			},
 			{
 				"slice ints union",
@@ -282,10 +282,10 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 				bar{Foos: []foo{{Int: 2}, {Int: 3}}},
 			},
 			{
-				"slice foos replace",
-				bar{FoosReplace: []foo{{Int: 1}, {Int: 2}}},
-				bar{FoosReplace: []foo{{Int: 2}, {Int: 3}}},
-				bar{FoosReplace: []foo{{Int: 2}, {Int: 3}}},
+				"slice foos atomic",
+				bar{FoosAtomic: []foo{{Int: 1}, {Int: 2}}},
+				bar{FoosAtomic: []foo{{Int: 2}, {Int: 3}}},
+				bar{FoosAtomic: []foo{{Int: 2}, {Int: 3}}},
 			},
 			{
 				"slice foos union",

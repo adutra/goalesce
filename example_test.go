@@ -59,7 +59,7 @@ func Example() {
 	coalesced, _ = goalesce.Coalesce(v1, v2)
 	fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
 
-	// Coalescing slices with default replace semantics
+	// Coalescing slices with default atomic semantics
 	v1 = []int{1, 2}
 	v2 = []int{2, 3}
 	coalesced, _ = goalesce.Coalesce(v1, v2)
@@ -108,7 +108,7 @@ func Example() {
 		Description string
 		Actors      []Actor           `coalesceStrategy:"merge" coalesceMergeKey:"Id"`
 		Tags        []string          `coalesceStrategy:"union"`
-		Labels      map[string]string `coalesceStrategy:"replace"`
+		Labels      map[string]string `coalesceStrategy:"atomic"`
 	}
 	v1 = Movie{
 		Name:        "The Matrix",

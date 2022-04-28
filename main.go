@@ -42,8 +42,8 @@ func WithAtomicType(t reflect.Type) MainCoalescerOption {
 //   true  nil   true
 //   true  false false
 //   true  true  true
-// The biggest difference with regular boolean pointers is that Coalesce(&true, &false) will return &true, while with
-// trileans, it will return &false.
+// The biggest difference with regular boolean pointers is that Coalesce(&true, &false) will return &true for boolean
+// pointers, while with trileans, it will return &false.
 func WithTrileans() MainCoalescerOption {
 	return WithAtomicType(reflect.PtrTo(reflect.TypeOf(false)))
 }

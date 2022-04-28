@@ -382,6 +382,9 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 		type missingKey2 struct {
 			Ints []int `goalesce:"merge,"`
 		}
+		type missingKey3 struct {
+			Ints []int `goalesce:"merge key"`
+		}
 		type wrongElemType struct {
 			Ints []int `goalesce:"merge,irrelevant"`
 		}
@@ -436,6 +439,12 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 				missingKey2{Ints: []int{1}},
 				missingKey2{Ints: []int{2}},
 				"field goalesce.missingKey2.Ints: merge strategy must be followed by a comma and the merge key",
+			},
+			{
+				"missing merge key 3",
+				missingKey3{Ints: []int{1}},
+				missingKey3{Ints: []int{2}},
+				"field goalesce.missingKey3.Ints: merge strategy must be followed by a comma and the merge key",
 			},
 			{
 				"wrong element type",

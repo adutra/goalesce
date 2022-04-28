@@ -167,8 +167,8 @@ func (c *structCoalescer) mergeFieldCoalescer(structType reflect.Type, field ref
 		return nil, fmt.Errorf("field %s.%s: merge strategy is only supported for slices", structType.String(), field.Name)
 	}
 	var key string
-	if len(strategy) >= len(CoalesceStrategyMerge)+1 {
-		key = strategy[len(CoalesceStrategyMerge)+1:]
+	if i := strings.IndexRune(strategy, ','); i != -1 {
+		key = strategy[i+1:]
 	}
 	if key == "" {
 		return nil, fmt.Errorf("field %s.%s: %s strategy must be followed by a comma and the merge key", structType.String(), field.Name, CoalesceStrategyMerge)

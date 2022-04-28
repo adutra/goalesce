@@ -290,7 +290,7 @@ Output:
 
 When the default struct coalescing behavior is not desired or sufficient, per-field coalescing strategies can be used. 
 
-The struct tag `coalesceStrategy` allows to specify the following per-field strategies:
+The struct tag `goalesce` allows to specify the following per-field strategies:
 
 | Strategy   | Valid on               | Effect                              |
 |------------|------------------------|-------------------------------------|
@@ -300,8 +300,8 @@ The struct tag `coalesceStrategy` allows to specify the following per-field stra
 | `index`    | Slice fields           | Applies "merge-by-index" semantics. |   
 | `merge`    | Slice of struct fields | Applies "merge-by-key" semantics.   |   
 
-With `merge`, a merge key must also be provided in another struct tag: `coalesceMergeKey`. The merge key _must_ be the
-name of a field in the slice's struct element type.
+With `merge`, a merge key must also be provided, separated by a comma from the strategy name itself, e.g.
+`goalesce:"merge,Id"`.  The merge key _must_ be the name of a field in the slice's struct element type.
 
 Example:
 
@@ -313,9 +313,9 @@ type Actor struct {
 type Movie struct {
     Name        string
     Description string
-    Actors      []Actor           `coalesceStrategy:"merge" coalesceMergeKey:"Id"`
-    Tags        []string          `coalesceStrategy:"union"`
-    Labels      map[string]string `coalesceStrategy:"atomic"`
+    Actors      []Actor           `goalesce:"merge,Id"`
+    Tags        []string          `goalesce:"union"`
+    Labels      map[string]string `goalesce:"atomic"`
 }
 v1 = Movie{
     Name:        "The Matrix",

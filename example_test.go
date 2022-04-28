@@ -106,9 +106,9 @@ func Example() {
 	type Movie struct {
 		Name        string
 		Description string
-		Actors      []Actor           `coalesceStrategy:"merge" coalesceMergeKey:"Id"`
-		Tags        []string          `coalesceStrategy:"union"`
-		Labels      map[string]string `coalesceStrategy:"atomic"`
+		Actors      []Actor           `goalesce:"merge,Id"`
+		Tags        []string          `goalesce:"union"`
+		Labels      map[string]string `goalesce:"atomic"`
 	}
 	v1 = Movie{
 		Name:        "The Matrix",

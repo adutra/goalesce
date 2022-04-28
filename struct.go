@@ -121,15 +121,16 @@ func (c *structCoalescer) fieldCoalescerFromTag(structType reflect.Type, field r
 	if !found {
 		return nil, nil
 	}
-	if coalesceStrategy == CoalesceStrategyAtomic {
+	switch {
+	case coalesceStrategy == CoalesceStrategyAtomic:
 		return NewAtomicCoalescer(), nil
-	} else if coalesceStrategy == CoalesceStrategyAppend {
+	case coalesceStrategy == CoalesceStrategyAppend:
 		return c.appendFieldCoalescer(structType, field)
-	} else if coalesceStrategy == CoalesceStrategyUnion {
+	case coalesceStrategy == CoalesceStrategyUnion:
 		return c.unionFieldCoalescer(structType, field)
-	} else if coalesceStrategy == CoalesceStrategyIndex {
+	case coalesceStrategy == CoalesceStrategyIndex:
 		return c.indexFieldCoalescer(structType, field)
-	} else if strings.HasPrefix(coalesceStrategy, CoalesceStrategyMerge) {
+	case strings.HasPrefix(coalesceStrategy, CoalesceStrategyMerge):
 		return c.mergeFieldCoalescer(structType, field, coalesceStrategy)
 	}
 	return nil, fmt.Errorf("field %s.%s: unknown coalesce strategy: %s", structType.String(), field.Name, coalesceStrategy)

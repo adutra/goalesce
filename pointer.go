@@ -26,7 +26,7 @@ type PointerCoalescerOption func(c *pointerCoalescer)
 // NewPointerCoalescer creates a new Coalescer for pointer types.
 func NewPointerCoalescer(opts ...PointerCoalescerOption) Coalescer {
 	c := &pointerCoalescer{
-		fallback: &defaultCoalescer{},
+		fallback: &atomicCoalescer{},
 	}
 	for _, opt := range opts {
 		opt(c)

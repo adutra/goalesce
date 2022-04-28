@@ -178,7 +178,7 @@ func TestCoalesce(t *testing.T) {
 			"struct non zero custom coalescer",
 			bar{Int: 0, Foo: foo{Int: 1}},
 			bar{Int: 1},
-			[]MainCoalescerOption{WithStructCoalescer(NewDefaultCoalescer())},
+			[]MainCoalescerOption{WithStructCoalescer(NewAtomicCoalescer())},
 			bar{Int: 1},
 		},
 		{
@@ -199,7 +199,7 @@ func TestCoalesce(t *testing.T) {
 			"map[int]foo custom coalescer",
 			map[int]foo{1: {Int: 1}, 3: {Int: 3}},
 			map[int]foo{1: {Int: 2}, 2: {Int: 2}},
-			[]MainCoalescerOption{WithMapCoalescer(NewDefaultCoalescer())},
+			[]MainCoalescerOption{WithMapCoalescer(NewAtomicCoalescer())},
 			map[int]foo{1: {Int: 2}, 2: {Int: 2}},
 		},
 		{
@@ -266,7 +266,7 @@ func TestCoalesce(t *testing.T) {
 			[]*foo{{Int: 3}, {Int: 4}, {Int: 5}},
 			[]MainCoalescerOption{
 				WithSliceCoalescer(NewSliceCoalescer(WithMergeByField(reflect.TypeOf(foo{}), "Int"))),
-				WithTypeCoalescer(reflect.TypeOf([]*foo{}), &defaultCoalescer{})}, // will prevail
+				WithTypeCoalescer(reflect.TypeOf([]*foo{}), &atomicCoalescer{})}, // will prevail
 			[]*foo{{Int: 3}, {Int: 4}, {Int: 5}},
 		},
 		{"trilean nil nil", (*bool)(nil), (*bool)(nil), []MainCoalescerOption{WithTrileans()}, (*bool)(nil)},

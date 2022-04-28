@@ -27,9 +27,9 @@ When called with no options, the function uses the following coalescing algorith
   - If both values are pointers, coalesce the values pointed to.
   - If both values are maps, coalesce the maps recursively, key by key.
   - If both values are structs, coalesce the structs recursively, field by field.
-  - For other types (including slices), return the second value ("replace" semantics).
+  - For other types (including slices), return the second value ("atomic" semantics).
 
-Note that by default, slices are coalesced with replace semantics, that is, the second slice overwrites the first one
+Note that by default, slices are coalesced with atomic semantics, that is, the second slice overwrites the first one
 completely. It is possible to change this behavior, see examples below.
 
 The `Coalesce` function can be called with a list of options to modify its default coalescing behavior. See the
@@ -39,7 +39,7 @@ documentation of each option for details.
 
 ### Coalescing scalars
 
-Scalars are always coalesced with replace semantics when both values are non-zero-values:
+Scalars are always coalesced with atomic semantics when both values are non-zero-values:
 
 ```go
 v1 := "abc"
@@ -86,7 +86,8 @@ Output:
 
 ### Coalescing slices
 
-When both slices are non-zero-values, the default behavior is to _replace_ the first slice with the second one: 
+When both slices are non-zero-values, the default behavior is to apply atomic semantics, that is, to _replace_ the first
+slice with the second one:
 
 ```go
 v1 := []int{1, 2}
@@ -291,13 +292,13 @@ When the default struct coalescing behavior is not desired or sufficient, per-fi
 
 The struct tag `coalesceStrategy` allows to specify the following per-field strategies:
 
-| Strategy  | Valid on               | Effect                              |
-|-----------|------------------------|-------------------------------------|
-| `replace` | Any field              | Applies "replace" semantics.        |
-| `union`   | Slice fields           | Applies "set-union" semantics.      |
-| `append`  | Slice fields           | Applies "list-append" semantics.    |   
-| `index`   | Slice fields           | Applies "merge-by-index" semantics. |   
-| `merge`   | Slice of struct fields | Applies "merge-by-key" semantics.   |   
+| Strategy   | Valid on               | Effect                              |
+|------------|------------------------|-------------------------------------|
+| `atomic`   | Any field              | Applies "atomic" semantics.         |
+| `union`    | Slice fields           | Applies "set-union" semantics.      |
+| `append`   | Slice fields           | Applies "list-append" semantics.    |   
+| `index`    | Slice fields           | Applies "merge-by-index" semantics. |   
+| `merge`    | Slice of struct fields | Applies "merge-by-key" semantics.   |   
 
 With `merge`, a merge key must also be provided in another struct tag: `coalesceMergeKey`. The merge key _must_ be the
 name of a field in the slice's struct element type.
@@ -314,7 +315,7 @@ type Movie struct {
     Description string
     Actors      []Actor           `coalesceStrategy:"merge" coalesceMergeKey:"Id"`
     Tags        []string          `coalesceStrategy:"union"`
-    Labels      map[string]string `coalesceStrategy:"replace"`
+    Labels      map[string]string `coalesceStrategy:"atomic"`
 }
 v1 = Movie{
     Name:        "The Matrix",

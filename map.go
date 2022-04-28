@@ -23,7 +23,7 @@ type MapCoalescerOption func(c *mapCoalescer)
 // NewMapCoalescer creates a new Coalescer for maps.
 func NewMapCoalescer(opts ...MapCoalescerOption) Coalescer {
 	c := &mapCoalescer{
-		fallback: &defaultCoalescer{},
+		fallback: &atomicCoalescer{},
 	}
 	for _, opt := range opts {
 		opt(c)

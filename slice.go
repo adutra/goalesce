@@ -25,7 +25,7 @@ type SliceCoalescerOption func(c *sliceCoalescer)
 // NewSliceCoalescer creates a new Coalescer for slices.
 func NewSliceCoalescer(opts ...SliceCoalescerOption) Coalescer {
 	sc := &sliceCoalescer{
-		defaultCoalescer: &defaultCoalescer{},
+		defaultCoalescer: &atomicCoalescer{},
 	}
 	for _, opt := range opts {
 		opt(sc)

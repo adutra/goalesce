@@ -21,10 +21,10 @@ import (
 // MainCoalescerOption is an option that can be passed the main Coalesce function to customize its coalescing behavior.
 type MainCoalescerOption func(c *mainCoalescer)
 
-// WithAtomicType causes the given type to be coalesced atomically, that is, with  "replace" semantics, instead of its
+// WithAtomicType causes the given type to be coalesced atomically, that is, with  "atomic" semantics, instead of its
 // default coalesce semantics. When 2 non-zero-values of this type are coalesced, the second value is returned as is.
 func WithAtomicType(t reflect.Type) MainCoalescerOption {
-	return WithTypeCoalescer(t, &defaultCoalescer{})
+	return WithTypeCoalescer(t, &atomicCoalescer{})
 }
 
 // WithTrileans causes all boolean pointers to be coalesced using a three-valued logic, instead of their default
@@ -110,7 +110,7 @@ func WithInterfaceCoalescer(coalescer Coalescer) MainCoalescerOption {
 // function. The main coalescer always sets itself as the fallback coalescer for all its delegating coalescers.
 func NewMainCoalescer(opts ...MainCoalescerOption) *mainCoalescer {
 	c := &mainCoalescer{
-		defaultCoalescer:   NewDefaultCoalescer(),
+		defaultCoalescer:   NewAtomicCoalescer(),
 		sliceCoalescer:     NewSliceCoalescer(),
 		mapCoalescer:       NewMapCoalescer(),
 		structCoalescer:    NewStructCoalescer(),

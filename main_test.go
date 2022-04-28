@@ -24,13 +24,13 @@ import (
 func TestNewMainCoalescer(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		expected := &mainCoalescer{}
-		expected.defaultCoalescer = &defaultCoalescer{}
+		expected.defaultCoalescer = &atomicCoalescer{}
 		expected.interfaceCoalescer = &interfaceCoalescer{fallback: expected}
 		expected.pointerCoalescer = &pointerCoalescer{fallback: expected}
 		expected.mapCoalescer = &mapCoalescer{fallback: expected}
 		expected.structCoalescer = &structCoalescer{fallback: expected}
 		expected.sliceCoalescer = &sliceCoalescer{
-			defaultCoalescer: &defaultCoalescer{},
+			defaultCoalescer: &atomicCoalescer{},
 		}
 		actual := NewMainCoalescer()
 		assert.Equal(t, expected, actual)
@@ -50,13 +50,13 @@ func TestNewMainCoalescer(t *testing.T) {
 		m := newMockCoalescer(t)
 		m.On("WithFallback", mock.Anything).Return()
 		expected := &mainCoalescer{}
-		expected.defaultCoalescer = &defaultCoalescer{}
+		expected.defaultCoalescer = &atomicCoalescer{}
 		expected.interfaceCoalescer = &interfaceCoalescer{fallback: expected}
 		expected.pointerCoalescer = &pointerCoalescer{fallback: expected}
 		expected.mapCoalescer = &mapCoalescer{fallback: expected}
 		expected.structCoalescer = &structCoalescer{fallback: expected}
 		expected.sliceCoalescer = &sliceCoalescer{
-			defaultCoalescer: &defaultCoalescer{},
+			defaultCoalescer: &atomicCoalescer{},
 		}
 		expected.typeCoalescers = map[reflect.Type]Coalescer{
 			reflect.TypeOf(foo{}): m,
@@ -71,14 +71,14 @@ func TestNewMainCoalescer(t *testing.T) {
 func TestWithAtomicType(t *testing.T) {
 	c := &mainCoalescer{}
 	WithAtomicType(reflect.TypeOf(0))(c)
-	expected := map[reflect.Type]Coalescer{reflect.TypeOf(0): &defaultCoalescer{}}
+	expected := map[reflect.Type]Coalescer{reflect.TypeOf(0): &atomicCoalescer{}}
 	assert.Equal(t, expected, c.typeCoalescers)
 }
 
 func TestWithTrileans(t *testing.T) {
 	c := &mainCoalescer{}
 	WithTrileans()(c)
-	expected := map[reflect.Type]Coalescer{reflect.PtrTo(reflect.TypeOf(false)): &defaultCoalescer{}}
+	expected := map[reflect.Type]Coalescer{reflect.PtrTo(reflect.TypeOf(false)): &atomicCoalescer{}}
 	assert.Equal(t, expected, c.typeCoalescers)
 }
 

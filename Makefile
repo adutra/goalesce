@@ -16,13 +16,8 @@ M = $(shell [ "$$(tput colors 2> /dev/null || echo 0)" -ge 8 ] && printf "\033[3
 
 export GO111MODULE=on
 
-GENERATED = # List of generated files
-
 .PHONY: all
-all: check-license mocks fmt lint $(GENERATED) | $(BIN) ; $(info $(M) building package...) @ ## Build package
-	$Q $(GO) build \
-		-tags release \
-		-ldflags '-X $(MODULE)/cmd.Version=$(VERSION) -X $(MODULE)/cmd.BuildDate=$(DATE)'
+all: check-license mocks fmt lint test-coverage | $(BIN)
 
 # Tools
 
@@ -53,8 +48,6 @@ $(BIN)/addlicense: PACKAGE=github.com/google/addlicense@latest
 MOCKERY = $(BIN)/mockery
 $(BIN)/mockery: PACKAGE=github.com/vektra/mockery/v2@latest
 
-# Generate
-
 # Tests
 
 TEST_TARGETS := test-bench test-short test-verbose test-race
@@ -65,13 +58,12 @@ test-verbose: ARGS=-v            ## Run tests in verbose mode with coverage repo
 test-race:    ARGS=-race         ## Run tests with race detector
 $(TEST_TARGETS): NAME=$(MAKECMDGOALS:test-%=%)
 $(TEST_TARGETS): test
-check test tests: check-license mocks fmt lint $(GENERATED) | $(GOTESTSUM) ; $(info $(M) running $(NAME:%=% )tests...) @ ## Run tests
+check test tests: | $(GOTESTSUM) ; $(info $(M) running $(NAME:%=% )tests...) @ ## Run tests
 	$Q mkdir -p test
 	$Q $(GOTESTSUM) --junitfile test/tests.xml -- -timeout $(TIMEOUT)s $(ARGS) $(PKGS)
 
 COVERAGE_MODE = atomic
 .PHONY: test-coverage
-test-coverage: check-license mocks fmt lint $(GENERATED)
 test-coverage: | $(GOCOV) $(GOCOVXML) $(GOTESTSUM) ; $(info $(M) running coverage tests...) @ ## Run coverage tests
 	$Q mkdir -p test
 	$Q $(GOTESTSUM) -- \
@@ -80,7 +72,7 @@ test-coverage: | $(GOCOV) $(GOCOVXML) $(GOTESTSUM) ; $(info $(M) running coverag
 		-coverprofile=test/profile.out $(PKGS)
 	$Q $(GO) tool cover -html=test/profile.out -o test/coverage.html
 	$Q $(GOCOV) convert test/profile.out | $(GOCOVXML) > test/coverage.xml
-	@echo -n "Code coverage: "; \
+	@echo "Code coverage: "; \
 		echo "scale=1;$$(sed -En 's/^<coverage line-rate="([0-9.]+)".*/\1/p' test/coverage.xml) * 100 / 1" | bc -q
 
 .PHONY: lint
@@ -95,7 +87,7 @@ fmt: | $(GOIMPORTS) ; $(info $(M) running gofmt...) @ ## Run gofmt on all source
 
 .PHONY: clean
 clean: ; $(info $(M) cleaning...)	@ ## Cleanup everything
-	@rm -rf $(BIN) test $(GENERATED)
+	@rm -rf $(BIN) test
 
 .PHONY: help
 help:

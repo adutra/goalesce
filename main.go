@@ -108,7 +108,7 @@ func WithInterfaceCoalescer(coalescer Coalescer) MainCoalescerOption {
 
 // NewMainCoalescer creates a new main coalescer with the given options. This is the Coalescer used by the Coalesce
 // function. The main coalescer always sets itself as the fallback coalescer for all its delegating coalescers.
-func NewMainCoalescer(opts ...MainCoalescerOption) *mainCoalescer {
+func NewMainCoalescer(opts ...MainCoalescerOption) Coalescer {
 	c := &mainCoalescer{
 		defaultCoalescer:   NewAtomicCoalescer(),
 		sliceCoalescer:     NewSliceCoalescer(),

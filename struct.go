@@ -20,14 +20,20 @@ import (
 	"strings"
 )
 
+// CoalesceStrategyTag is the struct tag used to specify the coalescing strategy to use for a struct field.
 const CoalesceStrategyTag = "goalesce"
 
 const (
+	// CoalesceStrategyAtomic applies "atomic" semantics.
 	CoalesceStrategyAtomic = "atomic"
+	// CoalesceStrategyAppend applies "list-append" semantics.
 	CoalesceStrategyAppend = "append"
-	CoalesceStrategyUnion  = "union"
-	CoalesceStrategyIndex  = "index"
-	CoalesceStrategyMerge  = "merge"
+	// CoalesceStrategyUnion applies "set-union" semantics.
+	CoalesceStrategyUnion = "union"
+	// CoalesceStrategyIndex applies "merge-by-index" semantics.
+	CoalesceStrategyIndex = "index"
+	// CoalesceStrategyMerge applies "merge-by-key" semantics.
+	CoalesceStrategyMerge = "merge"
 )
 
 // StructCoalescerOption is an option to be passed to NewStructCoalescer.

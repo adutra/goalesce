@@ -15,9 +15,10 @@
 package goalesce
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_indirect(t *testing.T) {

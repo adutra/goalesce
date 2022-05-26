@@ -16,11 +16,12 @@ package goalesce
 
 import (
 	"errors"
+	"reflect"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"reflect"
-	"testing"
 )
 
 func TestNewSliceCoalescer(t *testing.T) {

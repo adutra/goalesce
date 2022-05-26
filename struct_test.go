@@ -16,11 +16,12 @@ package goalesce
 
 import (
 	"errors"
+	"reflect"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"reflect"
-	"testing"
 )
 
 func TestNewStructCoalescer(t *testing.T) {
@@ -61,22 +62,22 @@ func TestNewStructCoalescer(t *testing.T) {
 
 func TestWithFieldCoalescer(t *testing.T) {
 	type User struct {
-		Id string
+		ID string
 	}
 	c := &structCoalescer{}
 	m := &mockCoalescer{}
-	WithFieldCoalescer(reflect.TypeOf(User{}), "Id", m)(c)
-	expected := map[reflect.Type]map[string]Coalescer{reflect.TypeOf(User{}): {"Id": m}}
+	WithFieldCoalescer(reflect.TypeOf(User{}), "ID", m)(c)
+	expected := map[reflect.Type]map[string]Coalescer{reflect.TypeOf(User{}): {"ID": m}}
 	assert.Equal(t, expected, c.fieldCoalescers)
 }
 
 func TestWithAtomicField(t *testing.T) {
 	type User struct {
-		Id string
+		ID string
 	}
 	c := &structCoalescer{}
-	WithAtomicField(reflect.TypeOf(User{}), "Id")(c)
-	expected := map[reflect.Type]map[string]Coalescer{reflect.TypeOf(User{}): {"Id": &atomicCoalescer{}}}
+	WithAtomicField(reflect.TypeOf(User{}), "ID")(c)
+	expected := map[reflect.Type]map[string]Coalescer{reflect.TypeOf(User{}): {"ID": &atomicCoalescer{}}}
 	assert.Equal(t, expected, c.fieldCoalescers)
 }
 

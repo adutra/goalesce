@@ -12,14 +12,14 @@ GO      = go
 TIMEOUT = 15
 V = 0
 Q = $(if $(filter 1,$V),,@)
-M = $(shell if [ "$$(tput colors 2> /dev/null || echo 0)" -ge 8 ]; then printf "\033[34;1m▶\033[0m"; else printf "▶"; fi)
+M = $(shell [ "$$(tput colors 2> /dev/null || echo 0)" -ge 8 ] && printf "\033[34;1m▶\033[0m" || printf "▶")
 
 export GO111MODULE=on
 
 GENERATED = # List of generated files
 
 .PHONY: all
-all: check-license fmt lint $(GENERATED) | $(BIN) ; $(info $(M) building package…) @ ## Build package
+all: check-license mocks fmt lint $(GENERATED) | $(BIN) ; $(info $(M) building package...) @ ## Build package
 	$Q $(GO) build \
 		-tags release \
 		-ldflags '-X $(MODULE)/cmd.Version=$(VERSION) -X $(MODULE)/cmd.BuildDate=$(DATE)'
@@ -28,7 +28,7 @@ all: check-license fmt lint $(GENERATED) | $(BIN) ; $(info $(M) building package
 
 $(BIN):
 	@mkdir -p $@
-$(BIN)/%: | $(BIN) ; $(info $(M) building $(PACKAGE)…)
+$(BIN)/%: | $(BIN) ; $(info $(M) building $(PACKAGE)...)
 	$Q env GOBIN=$(abspath $(BIN)) $(GO) install $(PACKAGE)
 
 GOIMPORTS = $(BIN)/goimports
@@ -65,14 +65,14 @@ test-verbose: ARGS=-v            ## Run tests in verbose mode with coverage repo
 test-race:    ARGS=-race         ## Run tests with race detector
 $(TEST_TARGETS): NAME=$(MAKECMDGOALS:test-%=%)
 $(TEST_TARGETS): test
-check test tests: check-license fmt lint $(GENERATED) | $(GOTESTSUM) ; $(info $(M) running $(NAME:%=% )tests…) @ ## Run tests
+check test tests: check-license mocks fmt lint $(GENERATED) | $(GOTESTSUM) ; $(info $(M) running $(NAME:%=% )tests...) @ ## Run tests
 	$Q mkdir -p test
 	$Q $(GOTESTSUM) --junitfile test/tests.xml -- -timeout $(TIMEOUT)s $(ARGS) $(PKGS)
 
 COVERAGE_MODE = atomic
 .PHONY: test-coverage
-test-coverage: check-license fmt lint $(GENERATED)
-test-coverage: | $(GOCOV) $(GOCOVXML) $(GOTESTSUM) ; $(info $(M) running coverage tests…) @ ## Run coverage tests
+test-coverage: check-license mocks fmt lint $(GENERATED)
+test-coverage: | $(GOCOV) $(GOCOVXML) $(GOTESTSUM) ; $(info $(M) running coverage tests...) @ ## Run coverage tests
 	$Q mkdir -p test
 	$Q $(GOTESTSUM) -- \
 		-coverpkg=$(shell echo $(PKGS) | tr ' ' ',') \
@@ -84,17 +84,17 @@ test-coverage: | $(GOCOV) $(GOCOVXML) $(GOTESTSUM) ; $(info $(M) running coverag
 		echo "scale=1;$$(sed -En 's/^<coverage line-rate="([0-9.]+)".*/\1/p' test/coverage.xml) * 100 / 1" | bc -q
 
 .PHONY: lint
-lint: | $(REVIVE) ; $(info $(M) running golint…) @ ## Run golint
+lint: | $(REVIVE) ; $(info $(M) running golint...) @ ## Run golint
 	$Q $(REVIVE) -formatter friendly -set_exit_status ./...
 
 .PHONY: fmt
-fmt: | $(GOIMPORTS) ; $(info $(M) running gofmt…) @ ## Run gofmt on all source files
+fmt: | $(GOIMPORTS) ; $(info $(M) running gofmt...) @ ## Run gofmt on all source files
 	$Q $(GOIMPORTS) -local $(MODULE) -w $(shell $(GO) list -f '{{$$d := .Dir}}{{range $$f := .GoFiles}}{{printf "%s/%s\n" $$d $$f}}{{end}}{{range $$f := .CgoFiles}}{{printf "%s/%s\n" $$d $$f}}{{end}}{{range $$f := .TestGoFiles}}{{printf "%s/%s\n" $$d $$f}}{{end}}' $(PKGS))
 
 # Misc
 
 .PHONY: clean
-clean: ; $(info $(M) cleaning…)	@ ## Cleanup everything
+clean: ; $(info $(M) cleaning...)	@ ## Cleanup everything
 	@rm -rf $(BIN) test $(GENERATED)
 
 .PHONY: help
@@ -114,10 +114,10 @@ pseudo-version:
 
 # License
 
-check-license: | $(ADDLICENSE) ; $(info $(M) checking license headers…)
+check-license: | $(ADDLICENSE) ; $(info $(M) checking license headers...)
 	$Q $(ADDLICENSE) -check -c "Alexandre Dutra" -ignore '.github/**'  -ignore '.idea/**' -ignore 'test/**' -ignore 'bin/**' . 2> /dev/null
 
-update-license: | $(ADDLICENSE) ; $(info $(M) updating license headers…)
+update-license: | $(ADDLICENSE) ; $(info $(M) updating license headers...)
 	$Q $(ADDLICENSE) -c "Alexandre Dutra" -ignore '.github/**'  -ignore '.idea/**' -ignore 'test/**' -ignore 'bin/**' . 2> /dev/null
 
 # Mocks

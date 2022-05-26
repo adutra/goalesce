@@ -19,7 +19,7 @@ export GO111MODULE=on
 GENERATED = # List of generated files
 
 .PHONY: all
-all: fmt lint $(GENERATED) | $(BIN) ; $(info $(M) building package…) @ ## Build package
+all: check-license fmt lint $(GENERATED) | $(BIN) ; $(info $(M) building package…) @ ## Build package
 	$Q $(GO) build \
 		-tags release \
 		-ldflags '-X $(MODULE)/cmd.Version=$(VERSION) -X $(MODULE)/cmd.BuildDate=$(DATE)'
@@ -46,6 +46,9 @@ $(BIN)/gocov-xml: PACKAGE=github.com/AlekSi/gocov-xml@latest
 GOTESTSUM = $(BIN)/gotestsum
 $(BIN)/gotestsum: PACKAGE=gotest.tools/gotestsum@latest
 
+ADDLICENSE = $(BIN)/addlicense
+$(BIN)/addlicense: PACKAGE=github.com/google/addlicense@latest
+
 # Generate
 
 # Tests
@@ -58,13 +61,13 @@ test-verbose: ARGS=-v            ## Run tests in verbose mode with coverage repo
 test-race:    ARGS=-race         ## Run tests with race detector
 $(TEST_TARGETS): NAME=$(MAKECMDGOALS:test-%=%)
 $(TEST_TARGETS): test
-check test tests: fmt lint $(GENERATED) | $(GOTESTSUM) ; $(info $(M) running $(NAME:%=% )tests…) @ ## Run tests
+check test tests: check-license fmt lint $(GENERATED) | $(GOTESTSUM) ; $(info $(M) running $(NAME:%=% )tests…) @ ## Run tests
 	$Q mkdir -p test
 	$Q $(GOTESTSUM) --junitfile test/tests.xml -- -timeout $(TIMEOUT)s $(ARGS) $(PKGS)
 
 COVERAGE_MODE = atomic
 .PHONY: test-coverage
-test-coverage: fmt lint $(GENERATED)
+test-coverage: check-license fmt lint $(GENERATED)
 test-coverage: | $(GOCOV) $(GOCOVXML) $(GOTESTSUM) ; $(info $(M) running coverage tests…) @ ## Run coverage tests
 	$Q mkdir -p test
 	$Q $(GOTESTSUM) -- \
@@ -100,8 +103,15 @@ version:
 	@echo $(VERSION)
 
 # See https://stackoverflow.com/questions/52242077/go-modules-finding-out-right-pseudo-version-vx-y-z-timestamp-commit-of-re
-PSEUDO_VERSION ?= $(shell TZ=UTC git --no-pager show --quiet --abbrev=12 \
-            --date='format-local:%Y%m%d%H%M%S' --format="%cd-%h" 2> /dev/null || echo v0)
+PSEUDO_VERSION ?= $(shell TZ=UTC git --no-pager show --quiet --abbrev=12 --date='format-local:%Y%m%d%H%M%S' --format="%cd-%h" 2> /dev/null || echo v0)
 .PHONY: pseudo-version
 pseudo-version:
 	@echo $(PSEUDO_VERSION)
+
+# License
+
+check-license: | $(ADDLICENSE) ; $(info $(M) checking license headers…)
+	$Q $(ADDLICENSE) -check -c "Alexandre Dutra" -ignore '.github/**'  -ignore '.idea/**' -ignore 'test/**' -ignore 'bin/**' . 2> /dev/null
+
+update-license: | $(ADDLICENSE) ; $(info $(M) updating license headers…)
+	$Q $(ADDLICENSE) -c "Alexandre Dutra" -ignore '.github/**'  -ignore '.idea/**' -ignore 'test/**' -ignore 'bin/**' . 2> /dev/null

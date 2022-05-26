@@ -22,3 +22,7 @@
 *~
 .vscode/
 .devcontainer/
+
+# Makefile directories
+bin/
+test/

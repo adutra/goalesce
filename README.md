@@ -116,6 +116,24 @@ Output:
 
     Coalesce([1 2], []) = []
 
+#### Treating empty slices as zero-values
+
+To consider empty slices as zero-values, use the `WithZeroEmptySlice` option. This changes the default behavior: when
+coalescing a non-empty slice with an empty slice, normally the empty slice is returned as in the example above; but with
+this option, the non-empty slice is returned.
+
+```go
+v1 = []int{1, 2}
+v2 = []int{} // empty slice will be considered zero-value
+sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithZeroEmptySlice())
+coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+fmt.Printf("Coalesce(%+v, %+v, ZeroEmptySlice) = %+v\n", v1, v2, coalesced)
+```
+
+Output:
+
+    Coalesce([1 2], [], ZeroEmptySlice) = [1 2]
+
 #### Using "set-union" strategy
 
 The "set-union" strategy can be used to coalesce the two slices together by creating a resulting slice that contains all

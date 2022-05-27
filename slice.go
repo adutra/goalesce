@@ -118,9 +118,19 @@ func WithMergeByIndex(elemType reflect.Type) SliceCoalescerOption {
 	}
 }
 
+// WithZeroEmptySlice instructs the coalescer to consider empty slices as zero (nil) slices. This changes the default
+// behavior: when coalescing a non-empty slice with an empty slice, normally the empty slice is returned, but with this
+// option, the non-empty slice is returned.
+func WithZeroEmptySlice() SliceCoalescerOption {
+	return func(c *sliceCoalescer) {
+		c.zeroEmptySlice = true
+	}
+}
+
 type sliceCoalescer struct {
 	defaultCoalescer Coalescer
 	elemCoalescers   map[reflect.Type]Coalescer
+	zeroEmptySlice   bool
 }
 
 func (c *sliceCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
@@ -129,6 +139,17 @@ func (c *sliceCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
 	}
 	if value, done := checkZero(v1, v2); done {
 		return value, nil
+	}
+	if v1.Len() == 0 && v2.Len() == 0 {
+		return v2, nil
+	}
+	if c.zeroEmptySlice {
+		if v1.Len() == 0 {
+			v1 = reflect.Zero(v1.Type())
+		}
+		if v2.Len() == 0 {
+			v2 = reflect.Zero(v2.Type())
+		}
 	}
 	elemType := v1.Type().Elem()
 	if coalescer, found := c.elemCoalescers[elemType]; found {

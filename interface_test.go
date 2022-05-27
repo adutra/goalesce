@@ -16,11 +16,12 @@ package goalesce
 
 import (
 	"errors"
+	"reflect"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"reflect"
-	"testing"
 )
 
 func TestNewInterfaceCoalescer(t *testing.T) {
@@ -89,6 +90,12 @@ func Test_interfaceCoalescer_Coalesce(t *testing.T) {
 			"structs",
 			foo{Int: 1},
 			foo{Int: 0},
+			foo{Int: 1},
+		},
+		{
+			"structs and empty structs",
+			foo{Int: 1},
+			foo{},
 			foo{Int: 1},
 		},
 		{

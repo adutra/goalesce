@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_mainCoalescer_coalescePointer(t *testing.T) {
+func Test_coalescer_deepCopyPointer(t *testing.T) {
 	type foo struct {
 		FieldInt int
 	}
@@ -78,13 +78,13 @@ func Test_mainCoalescer_coalescePointer(t *testing.T) {
 			"cycle 1",
 			simpleCycle(),
 			(*cycle)(nil),
-			simpleCycle(), // unnoticed
+			&cycle{Cycle: &cycle{}},
 		},
 		{
 			"cycle 2",
 			(*cycle)(nil),
 			simpleCycle(),
-			simpleCycle(), // unnoticed
+			&cycle{Cycle: &cycle{}},
 		},
 		{
 			"cycle 3",
@@ -114,7 +114,7 @@ func Test_mainCoalescer_coalescePointer(t *testing.T) {
 			"cycle 7",
 			complexCycle(),
 			&cycle{Cycle: &cycle{}},
-			complexCycle(), // unnoticed
+			&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}},
 		},
 		{
 			"cycle 8",
@@ -131,8 +131,8 @@ func Test_mainCoalescer_coalescePointer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			coalescer := NewCoalescer()
-			got, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+			deepMerge := NewDeepMergeFunc()
+			got, err := deepMerge(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())
 		})
@@ -140,18 +140,18 @@ func Test_mainCoalescer_coalescePointer(t *testing.T) {
 	t.Run("cycle errors", func(t *testing.T) {
 		withCycle := reflect.ValueOf(simpleCycle())
 		withoutCycle := reflect.ValueOf(&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}}})
-		coalescer := NewCoalescer(WithErrorOnCycle())
+		coalescer := NewDeepMergeFunc(WithErrorOnCycle())
 		_, err := coalescer(withCycle, withoutCycle)
 		assert.EqualError(t, err, "*goalesce.cycle: cycle detected")
-		coalescer = NewCoalescer(WithErrorOnCycle())
+		coalescer = NewDeepMergeFunc(WithErrorOnCycle())
 		_, err = coalescer(withoutCycle, withCycle)
 		assert.EqualError(t, err, "*goalesce.cycle: cycle detected")
 	})
 	t.Run("fallback error", func(t *testing.T) {
-		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
+		deepMerge := NewDeepMergeFunc(WithTypeMerger(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
 			return reflect.Value{}, errors.New("fake")
 		}))
-		_, err := coalescer(reflect.ValueOf(intPtr(1)), reflect.ValueOf(intPtr(2)))
+		_, err := deepMerge(reflect.ValueOf(intPtr(1)), reflect.ValueOf(intPtr(2)))
 		assert.EqualError(t, err, "fake")
 	})
 }

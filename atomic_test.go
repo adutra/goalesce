@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_coalesceAtomic(t *testing.T) {
+func Test_deepMergeAtomic(t *testing.T) {
 	type foo struct {
 		FieldInt int
 	}
@@ -226,7 +226,7 @@ func Test_coalesceAtomic(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := coalesceAtomic(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+			got, err := (&coalescer{}).deepMergeAtomic(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())
 		})

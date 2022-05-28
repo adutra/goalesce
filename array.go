@@ -18,25 +18,16 @@ import (
 	"reflect"
 )
 
-func (c *coalescer) deepMergeInterface(v1, v2 reflect.Value) (reflect.Value, error) {
-	if v1.Elem().Type() != v2.Elem().Type() {
-		return c.deepCopyInterface(v2)
-	}
-	coalesced := reflect.New(v1.Type())
-	coalescedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
-	if err != nil {
-		return reflect.Value{}, err
-	}
-	coalesced.Elem().Set(coalescedTarget)
-	return coalesced.Elem(), nil
-}
+// TODO deepMergeArray
 
-func (c *coalescer) deepCopyInterface(v reflect.Value) (reflect.Value, error) {
+func (c *coalescer) deepCopyArray(v reflect.Value) (reflect.Value, error) {
 	copied := reflect.New(v.Type())
-	copiedTarget, err := c.deepCopy(v.Elem())
-	if err != nil {
-		return reflect.Value{}, err
+	for i := 0; i < v.Len(); i++ {
+		elem, err := c.deepCopy(v.Index(i))
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		copied.Elem().Index(i).Set(elem)
 	}
-	copied.Elem().Set(copiedTarget)
 	return copied.Elem(), nil
 }

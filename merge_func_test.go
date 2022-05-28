@@ -21,27 +21,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCoalescer(t *testing.T) {
+func TestNewDeepMergeFunc(t *testing.T) {
 	t.Run("with generic option", func(t *testing.T) {
 		var actual int
-		opt := func(c *mainCoalescer) {
+		opt := func(c *coalescer) {
 			actual = 1
 		}
-		NewCoalescer(opt)
+		NewDeepMergeFunc(opt)
 		assert.Equal(t, 1, actual)
 	})
 	t.Run("type errors", func(t *testing.T) {
-		_, err := NewCoalescer()(reflect.ValueOf(1), reflect.ValueOf("a"))
+		_, err := NewDeepMergeFunc()(reflect.ValueOf(1), reflect.ValueOf("a"))
 		assert.EqualError(t, err, "types do not match: int != string")
-		_, err = NewCoalescer()(reflect.ValueOf(map[string]int{"a": 2}), reflect.ValueOf(map[string]string{"a": "b"}))
+		_, err = NewDeepMergeFunc()(reflect.ValueOf(map[string]int{"a": 2}), reflect.ValueOf(map[string]string{"a": "b"}))
 		assert.EqualError(t, err, "types do not match: map[string]int != map[string]string")
-		_, err = NewCoalescer()(reflect.ValueOf(intPtr(1)), reflect.ValueOf(stringPtr("a")))
+		_, err = NewDeepMergeFunc()(reflect.ValueOf(intPtr(1)), reflect.ValueOf(stringPtr("a")))
 		assert.EqualError(t, err, "types do not match: *int != *string")
-		_, err = NewCoalescer()(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
+		_, err = NewDeepMergeFunc()(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
 		assert.EqualError(t, err, "types do not match: []int != []string")
-		_, err = NewCoalescer()(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
+		_, err = NewDeepMergeFunc()(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
 		assert.EqualError(t, err, "types do not match: []int != []string")
-		_, err = NewCoalescer()(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
+		_, err = NewDeepMergeFunc()(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
 		assert.EqualError(t, err, "types do not match: []int != []string")
 		type foo struct {
 			Int int
@@ -49,7 +49,7 @@ func TestNewCoalescer(t *testing.T) {
 		type bar struct {
 			Int int
 		}
-		_, err = NewCoalescer()(reflect.ValueOf(foo{}), reflect.ValueOf(bar{}))
+		_, err = NewDeepMergeFunc()(reflect.ValueOf(foo{}), reflect.ValueOf(bar{}))
 		assert.EqualError(t, err, "types do not match: goalesce.foo != goalesce.bar")
 	})
 }

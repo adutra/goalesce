@@ -14,11 +14,19 @@
 
 package goalesce
 
-import "reflect"
+import (
+	"reflect"
+)
 
-func (c *coalescer) deepMergeAtomic(v1, v2 reflect.Value) (reflect.Value, error) {
-	if v2.IsZero() {
-		return c.deepCopy(v1)
+// DeepCopyFunc is the main function for copying objects. Simple usages of this package do not need to implement
+// this function. Implementing this function is considered an advanced usage.
+type DeepCopyFunc func(v reflect.Value) (reflect.Value, error)
+
+// NewDeepCopyFunc creates a new DeepCopyFunc with the given options.
+func NewDeepCopyFunc(opts ...DeepCopyOption) DeepCopyFunc {
+	c := &coalescer{}
+	for _, opt := range opts {
+		opt(c)
 	}
-	return c.deepCopy(v2)
+	return c.deepCopy
 }

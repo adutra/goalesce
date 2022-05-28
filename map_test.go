@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_mainCoalescer_coalesceMap(t *testing.T) {
+func Test_coalescer_deepMergeMap(t *testing.T) {
 	type foo struct {
 		FieldInt int
 	}
@@ -309,17 +309,17 @@ func Test_mainCoalescer_coalesceMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			coalescer := NewCoalescer()
-			got, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+			deepMerge := NewDeepMergeFunc()
+			got, err := deepMerge(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())
 		})
 	}
 	t.Run("fallback error", func(t *testing.T) {
-		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
+		deepMerge := NewDeepMergeFunc(WithTypeMerger(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
 			return reflect.Value{}, errors.New("fake")
 		}))
-		_, err := coalescer(reflect.ValueOf(map[string]int{"a": 2}), reflect.ValueOf(map[string]int{"a": 2}))
+		_, err := deepMerge(reflect.ValueOf(map[string]int{"a": 2}), reflect.ValueOf(map[string]int{"a": 2}))
 		assert.EqualError(t, err, "fake")
 	})
 }

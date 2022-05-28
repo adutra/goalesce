@@ -18,25 +18,25 @@ import (
 	"reflect"
 )
 
-func (c *coalescer) deepMergeInterface(v1, v2 reflect.Value) (reflect.Value, error) {
-	if v1.Elem().Type() != v2.Elem().Type() {
-		return c.deepCopyInterface(v2)
+// DeepCopy deep-copies the value and returns the copied value.
+func DeepCopy(o interface{}, opts ...DeepCopyOption) (copied interface{}, err error) {
+	if o == nil {
+		return nil, nil
 	}
-	coalesced := reflect.New(v1.Type())
-	coalescedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
+	deepCopy := NewDeepCopyFunc(opts...)
+	v := reflect.ValueOf(o)
+	result, err := deepCopy(v)
 	if err != nil {
-		return reflect.Value{}, err
+		return nil, err
 	}
-	coalesced.Elem().Set(coalescedTarget)
-	return coalesced.Elem(), nil
+	return result.Interface(), nil
 }
 
-func (c *coalescer) deepCopyInterface(v reflect.Value) (reflect.Value, error) {
-	copied := reflect.New(v.Type())
-	copiedTarget, err := c.deepCopy(v.Elem())
+// MustDeepCopy is like DeepCopy, but panics if the copy returns an error.
+func MustDeepCopy(o interface{}, opts ...DeepCopyOption) interface{} {
+	copied, err := DeepCopy(o, opts...)
 	if err != nil {
-		return reflect.Value{}, err
+		panic(err)
 	}
-	copied.Elem().Set(copiedTarget)
-	return copied.Elem(), nil
+	return copied
 }

@@ -21,15 +21,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_coalesceAtomic(t *testing.T) {
+func Test_coalescer_deepMergeAtomic(t *testing.T) {
 	type foo struct {
 		FieldInt int
 	}
 	tests := []struct {
-		name string
-		v1   interface{}
-		v2   interface{}
-		want interface{}
+		name    string
+		v1      interface{}
+		v2      interface{}
+		want    interface{}
+		wantErr assert.ErrorAssertionFunc
+		opts    []Option
 	}{
 		{
 			name: "int both zero",
@@ -223,12 +225,46 @@ func Test_coalesceAtomic(t *testing.T) {
 			v2:   &foo{},
 			want: &foo{},
 		},
+		{
+			name:    "generic error",
+			v1:      123,
+			v2:      456,
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepCopyError},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := coalesceAtomic(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
-			assert.NoError(t, err)
-			assert.Equal(t, tt.want, got.Interface())
+			c := newCoalescer(tt.opts...)
+			got, err := c.deepMergeAtomic(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+			if err == nil {
+				assert.Equal(t, tt.want, got.Interface())
+				assertNotSame(t, tt.v1, got.Interface())
+				assertNotSame(t, tt.v2, got.Interface())
+			} else {
+				assert.False(t, got.IsValid())
+			}
+			if tt.wantErr != nil {
+				tt.wantErr(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
+}
+
+func Test_coalescer_deepCopyAtomic(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		input := (*int)(nil)
+		got, err := newCoalescer().deepCopyAtomic(reflect.ValueOf(input))
+		assert.NoError(t, err)
+		assert.Nil(t, got.Interface())
+	})
+	t.Run("non nil", func(t *testing.T) {
+		input := intPtr(123)
+		got, err := newCoalescer().deepCopyAtomic(reflect.ValueOf(input))
+		assert.NoError(t, err)
+		assert.Equal(t, input, got.Interface())
+		assert.Same(t, input, got.Interface()) // since this is atomic
+	})
 }

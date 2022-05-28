@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package goalesce is a library for coalescing objects in Go.
+// Package goalesce is a library for copying and merging objects in Go.
 //
 // Read the project's README file for more information:
 //

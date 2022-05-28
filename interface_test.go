@@ -15,124 +15,181 @@
 package goalesce
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func Test_mainCoalescer_coalesceInterface(t *testing.T) {
+func Test_coalescer_deepMergeInterface(t *testing.T) {
 	type foo struct {
 		FieldInt int
 	}
 	tests := []struct {
-		name string
-		v1   interface{}
-		v2   interface{}
-		want interface{}
+		name    string
+		v1      interface{}
+		v2      interface{}
+		want    interface{}
+		wantErr assert.ErrorAssertionFunc
+		opts    []Option
 	}{
 		{
-			"zeroes",
-			nil,
-			nil,
-			nil,
+			name: "zeroes",
+			v1:   nil,
+			v2:   nil,
+			want: nil,
 		},
 		{
-			"mixed zeroes 1",
-			123,
-			nil,
-			123,
+			name: "mixed zeroes 1",
+			v1:   123,
+			v2:   nil,
+			want: 123,
 		},
 		{
-			"mixed zeroes 2",
-			nil,
-			123,
-			123,
+			name: "mixed zeroes 2",
+			v1:   nil,
+			v2:   123,
+			want: 123,
 		},
 		{
-			"ints zeroes",
-			0,
-			0,
-			0,
+			name: "ints zeroes",
+			v1:   0,
+			v2:   0,
+			want: 0,
 		},
 		{
-			"ints",
-			1,
-			2,
-			2,
+			name: "ints",
+			v1:   1,
+			v2:   2,
+			want: 2,
 		},
 		{
-			"structs zeroes",
-			foo{},
-			foo{},
-			foo{},
+			name: "structs zeroes",
+			v1:   foo{},
+			v2:   foo{},
+			want: foo{},
 		},
 		{
-			"structs",
-			foo{FieldInt: 1},
-			foo{FieldInt: 0},
-			foo{FieldInt: 1},
+			name: "structs",
+			v1:   foo{FieldInt: 1},
+			v2:   foo{FieldInt: 0},
+			want: foo{FieldInt: 1},
 		},
 		{
-			"structs and empty structs",
-			foo{FieldInt: 1},
-			foo{},
-			foo{FieldInt: 1},
+			name: "structs and empty structs",
+			v1:   foo{FieldInt: 1},
+			v2:   foo{},
+			want: foo{FieldInt: 1},
 		},
 		{
-			"maps",
-			map[string]int{"a": 1},
-			map[string]int{"b": 2},
-			map[string]int{"a": 1, "b": 2},
+			name: "maps",
+			v1:   map[string]int{"a": 1},
+			v2:   map[string]int{"b": 2},
+			want: map[string]int{"a": 1, "b": 2},
 		},
 		{
-			"*ints zeroes",
-			(*int)(nil),
-			(*int)(nil),
-			(*int)(nil),
+			name: "*ints zeroes",
+			v1:   (*int)(nil),
+			v2:   (*int)(nil),
+			want: (*int)(nil),
 		},
 		{
-			"*ints",
-			intPtr(1),
-			intPtr(2),
-			intPtr(2),
+			name: "*ints",
+			v1:   intPtr(1),
+			v2:   intPtr(2),
+			want: intPtr(2),
 		},
 		{
-			"*structs zeroes",
-			(*foo)(nil),
-			(*foo)(nil),
-			(*foo)(nil),
+			name: "*structs zeroes",
+			v1:   (*foo)(nil),
+			v2:   (*foo)(nil),
+			want: (*foo)(nil),
 		},
 		{
-			"*structs",
-			&foo{FieldInt: 1},
-			&foo{FieldInt: 2},
-			&foo{FieldInt: 2},
+			name: "*structs",
+			v1:   &foo{FieldInt: 1},
+			v2:   &foo{FieldInt: 2},
+			want: &foo{FieldInt: 2},
 		},
 		{
-			"different types",
-			123,
-			12.34,
-			12.34,
+			name:    "different types",
+			v1:      123,
+			v2:      12.34,
+			wantErr: assert.Error,
+		},
+		{
+			name:    "generic error",
+			v1:      123,
+			v2:      456,
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepMergeError},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			coalescer := NewCoalescer()
-			got, err := coalescer(reflect.ValueOf(&tt.v1).Elem(), reflect.ValueOf(&tt.v2).Elem())
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got.Interface())
+			c := newCoalescer(tt.opts...)
+			got, err := c.deepMergeInterface(reflect.ValueOf(&tt.v1).Elem(), reflect.ValueOf(&tt.v2).Elem())
+			if err == nil {
+				assert.Equal(t, tt.want, got.Interface())
+				assertNotSame(t, tt.v1, got.Interface())
+				assertNotSame(t, tt.v2, got.Interface())
+			} else {
+				assert.False(t, got.IsValid())
+			}
+			if tt.wantErr != nil {
+				tt.wantErr(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
-	t.Run("fallback error", func(t *testing.T) {
-		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
-			return reflect.Value{}, errors.New("fake")
-		}))
-		var v1 interface{} = 1
-		var v2 interface{} = 2
-		_, err := coalescer(reflect.ValueOf(&v1).Elem(), reflect.ValueOf(&v2).Elem())
-		assert.EqualError(t, err, "fake")
-	})
+}
+
+func Test_coalescer_deepCopyInterface(t *testing.T) {
+	tests := []struct {
+		name    string
+		v       interface{}
+		wantErr assert.ErrorAssertionFunc
+		opts    []Option
+	}{
+		{
+			name: "untyped nil",
+			v:    nil,
+		},
+		{
+			name: "typed nil",
+			v:    (*int)(nil),
+		},
+		{
+			name: "zero",
+			v:    0,
+		},
+		{
+			name: "non zero",
+			v:    123,
+		},
+		{
+			name:    "error",
+			v:       reflect.ValueOf([3]int{1, 2, 3}),
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepCopyError},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newCoalescer(tt.opts...)
+			got, err := c.deepCopyInterface(reflect.ValueOf(&tt.v).Elem())
+			if err == nil {
+				assert.Equal(t, tt.v, got.Interface())
+				assertNotSame(t, tt.v, got.Interface())
+			} else {
+				assert.False(t, got.IsValid())
+			}
+			if tt.wantErr != nil {
+				tt.wantErr(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

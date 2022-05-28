@@ -14,61 +14,92 @@
 
 package goalesce
 
-import (
-	"reflect"
-)
+import "reflect"
 
-// Coalescer is the main function for coalescing objects. Simple usages of this package do not need to implement this
-// function. Implementing this function is considered an advanced usage.
-// A coalescer function coalesces the 2 values into a single value, favoring v2 over v1 in case of conflicts. Note that
-// the passed values can be zero-values, but will never be invalid values.
-// When a coalescer function returns an invalid value and a nil error, it is assumed that the function is delegating the
-// coalescing to its parent, if any.
-type Coalescer func(v1, v2 reflect.Value) (reflect.Value, error)
+// coalescer is the engine for merging and copying objets. It has two methods that satisfy
+// DeepMergeFunc and DeepCopyFunc: deepMerge and deepCopy respectively.
+type coalescer struct {
+	deepCopy       DeepCopyFunc
+	deepMerge      DeepMergeFunc
+	typeCopiers    map[reflect.Type]DeepCopyFunc
+	typeMergers    map[reflect.Type]DeepMergeFunc
+	sliceMerger    DeepMergeFunc
+	sliceMergers   map[ /* slice type */ reflect.Type]DeepMergeFunc
+	fieldMergers   map[ /* struct type */ reflect.Type]map[ /* field name */ string]DeepMergeFunc
+	zeroEmptySlice bool
+	errorOnCycle   bool
+	seen           map[uintptr]bool
+}
 
-// NewCoalescer creates a new coalescer with the given options.
-func NewCoalescer(opts ...CoalescerOption) Coalescer {
-	c := &mainCoalescer{}
+func newCoalescer(opts ...Option) *coalescer {
+	c := &coalescer{
+		typeCopiers:  make(map[reflect.Type]DeepCopyFunc),
+		typeMergers:  make(map[reflect.Type]DeepMergeFunc),
+		sliceMergers: make(map[reflect.Type]DeepMergeFunc),
+		fieldMergers: make(map[reflect.Type]map[string]DeepMergeFunc),
+		seen:         make(map[uintptr]bool),
+	}
+	c.deepCopy = c.defaultDeepCopy
+	c.deepMerge = c.defaultDeepMerge
 	for _, opt := range opts {
 		opt(c)
 	}
-	return c.coalesce
+	return c
 }
 
-type mainCoalescer struct {
-	typeCoalescers  map[reflect.Type]Coalescer
-	sliceCoalescer  Coalescer
-	sliceCoalescers map[ /* slice type */ reflect.Type]Coalescer
-	fieldCoalescers map[ /* struct type */ reflect.Type]map[ /* field name */ string]Coalescer
-	zeroEmptySlice  bool
-	errorOnCycle    bool
-	seen            map[uintptr]bool
-}
-
-func (c *mainCoalescer) coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
+// defaultDeepMerge is the default implementation of DeepMergeFunc. It is used when the coalescer is
+// created with default options. In the absence of a specific type merger, it merely delegates to
+// the appropriate specialized merge methods, depending on the type of the values to merge.
+func (c *coalescer) defaultDeepMerge(v1, v2 reflect.Value) (reflect.Value, error) {
 	if err := checkTypesMatch(v1, v2); err != nil {
 		return reflect.Value{}, err
 	}
-	if coalescer, found := c.typeCoalescers[v1.Type()]; found {
-		value, err := coalescer(v1, v2)
+	if merger, found := c.typeMergers[v1.Type()]; found {
+		value, err := merger(v1, v2)
 		if value.IsValid() || err != nil {
 			return value, err
 		}
 	}
-	if value, done := checkZero(v1, v2); done {
-		return value, nil
-	}
 	switch v1.Type().Kind() {
 	case reflect.Interface:
-		return c.coalesceInterface(v1, v2)
+		return c.deepMergeInterface(v1, v2)
 	case reflect.Ptr:
-		return c.coalescePointer(v1, v2)
+		return c.deepMergePointer(v1, v2)
 	case reflect.Map:
-		return c.coalesceMap(v1, v2)
+		return c.deepMergeMap(v1, v2)
 	case reflect.Struct:
-		return c.coalesceStruct(v1, v2)
+		return c.deepMergeStruct(v1, v2)
 	case reflect.Slice:
-		return c.coalesceSlice(v1, v2)
+		return c.deepMergeSlice(v1, v2)
+	case reflect.Array:
+		return c.deepMergeArray(v1, v2)
 	}
-	return coalesceAtomic(v1, v2)
+	return c.deepMergeAtomic(v1, v2)
+}
+
+// defaultDeepCopy is the default implementation of DeepCopyFunc. It is used when the coalescer is
+// created with default options. In the absence of a specific type copier, it merely delegates to
+// the appropriate specialized copy methods, depending on the type of the values to copy.
+func (c *coalescer) defaultDeepCopy(v reflect.Value) (reflect.Value, error) {
+	if copier, found := c.typeCopiers[v.Type()]; found {
+		value, err := copier(v)
+		if value.IsValid() || err != nil {
+			return value, err
+		}
+	}
+	switch v.Type().Kind() {
+	case reflect.Interface:
+		return c.deepCopyInterface(v)
+	case reflect.Ptr:
+		return c.deepCopyPointer(v)
+	case reflect.Map:
+		return c.deepCopyMap(v)
+	case reflect.Struct:
+		return c.deepCopyStruct(v)
+	case reflect.Slice:
+		return c.deepCopySlice(v)
+	case reflect.Array:
+		return c.deepCopyArray(v)
+	}
+	return c.deepCopyAtomic(v)
 }

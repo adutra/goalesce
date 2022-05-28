@@ -16,31 +16,32 @@ package goalesce
 
 import "reflect"
 
-func (c *coalescer) deepMergeInterface(v1, v2 reflect.Value) (reflect.Value, error) {
+func (c *coalescer) deepMergeArray(v1, v2 reflect.Value) (reflect.Value, error) {
 	if value, done := checkZero(v1, v2); done {
 		return c.deepCopy(value)
 	}
-	if err := checkTypesMatch(v1.Elem(), v2.Elem()); err != nil {
-		return reflect.Value{}, err
+	merged := reflect.New(v1.Type())
+	for i := 0; i < v1.Len(); i++ {
+		elem, err := c.deepMerge(v1.Index(i), v2.Index(i))
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		merged.Elem().Index(i).Set(elem)
 	}
-	coalesced := reflect.New(v1.Type())
-	coalescedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
-	if err != nil {
-		return reflect.Value{}, err
-	}
-	coalesced.Elem().Set(coalescedTarget)
-	return coalesced.Elem(), nil
+	return merged.Elem(), nil
 }
 
-func (c *coalescer) deepCopyInterface(v reflect.Value) (reflect.Value, error) {
+func (c *coalescer) deepCopyArray(v reflect.Value) (reflect.Value, error) {
 	if v.IsZero() {
 		return reflect.Zero(v.Type()), nil
 	}
 	copied := reflect.New(v.Type())
-	copiedTarget, err := c.deepCopy(v.Elem())
-	if err != nil {
-		return reflect.Value{}, err
+	for i := 0; i < v.Len(); i++ {
+		elem, err := c.deepCopy(v.Index(i))
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		copied.Elem().Index(i).Set(elem)
 	}
-	copied.Elem().Set(copiedTarget)
 	return copied.Elem(), nil
 }

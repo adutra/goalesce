@@ -70,10 +70,17 @@ func Example() {
 	coalesced, _ = goalesce.Coalesce(v1, v2)
 	fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
 
+	// Coalescing slices with empty slices treated as zero-value slices
+	v1 = []int{1, 2}
+	v2 = []int{} // empty slice will be considered zero-value
+	sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithZeroEmptySlice())
+	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+	fmt.Printf("Coalesce(%+v, %+v, ZeroEmptySlice) = %+v\n", v1, v2, coalesced)
+
 	// Coalescing slices with set-union semantics
 	v1 = []int{1, 2}
 	v2 = []int{2, 3}
-	sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultSetUnion())
+	sliceCoalescer = goalesce.NewSliceCoalescer(goalesce.WithDefaultSetUnion())
 	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
 	fmt.Printf("Coalesce(%+v, %+v, SetUnion) = %+v\n", v1, v2, coalesced)
 
@@ -146,6 +153,7 @@ func Example() {
 	// Coalesce(map[1:a 2:b], map[2:c 3:d]) = map[1:a 2:c 3:d]
 	// Coalesce([1 2], [2 3]) = [2 3]
 	// Coalesce([1 2], []) = []
+	// Coalesce([1 2], [], ZeroEmptySlice) = [1 2]
 	// Coalesce([1 2], [2 3], SetUnion) = [1 2 3]
 	// Coalesce([1 2], [2 3], ListAppend) = [1 2 2 3]
 	// Coalesce([1 2 3], [-1 -2], MergeByIndex) = [-1 -2 3]

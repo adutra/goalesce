@@ -1521,6 +1521,48 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			[]SliceCoalescerOption{WithListAppend(reflect.PtrTo(reflect.TypeOf(bar{})))},
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil, {Int: intPtr(2)}, {Int: intPtr(4)}, {Int: nil}, nil},
 		},
+		{
+			"[]int nil + nil w/ zero empty option",
+			[]int(nil),
+			[]int(nil),
+			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]int(nil),
+		},
+		{
+			"[]int nil + empty w/ zero empty option",
+			[]int(nil),
+			[]int{},
+			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]int{},
+		},
+		{
+			"[]int empty + nil w/ zero empty option",
+			[]int{},
+			[]int(nil),
+			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]int{},
+		},
+		{
+			"[]int empty + empty w/ zero empty option",
+			[]int{},
+			[]int{},
+			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]int{},
+		},
+		{
+			"[]int empty + non-empty w/ zero empty option",
+			[]int{},
+			[]int{1, 2, 3},
+			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]int{1, 2, 3},
+		},
+		{
+			"[]int non-empty + empty w/ zero empty option",
+			[]int{1, 2, 3},
+			[]int{},
+			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]int{1, 2, 3},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1528,7 +1570,7 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			coalescer.WithFallback(NewMainCoalescer())
 			got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 			require.NoError(t, err)
-			assert.ElementsMatch(t, tt.want, got.Interface())
+			assert.Equal(t, tt.want, got.Interface())
 		})
 	}
 	t.Run("type errors", func(t *testing.T) {

@@ -151,8 +151,7 @@ func WithZeroEmptySlice() CoalescerOption {
 // be a unique identifier or primary key for objects of this type.
 func WithMergeByField(sliceOfStructType reflect.Type, field string) CoalescerOption {
 	return func(c *mainCoalescer) {
-		f := newMergeByField(field)
-		WithMergeByKey(sliceOfStructType, f)(c)
+		WithMergeByKey(sliceOfStructType, newMergeByField(field))(c)
 	}
 }
 

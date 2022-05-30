@@ -25,10 +25,10 @@ import (
 
 func Test_mainCoalescer_coalesceMap(t *testing.T) {
 	type foo struct {
-		Int int
+		FieldInt int
 	}
 	type bar struct {
-		Int *int
+		FieldIntPtr *int
 	}
 	tests := []struct {
 		name string

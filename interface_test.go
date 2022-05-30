@@ -25,7 +25,7 @@ import (
 
 func Test_mainCoalescer_coalesceInterface(t *testing.T) {
 	type foo struct {
-		Int int
+		FieldInt int
 	}
 	tests := []struct {
 		name string
@@ -71,15 +71,15 @@ func Test_mainCoalescer_coalesceInterface(t *testing.T) {
 		},
 		{
 			"structs",
-			foo{Int: 1},
-			foo{Int: 0},
-			foo{Int: 1},
+			foo{FieldInt: 1},
+			foo{FieldInt: 0},
+			foo{FieldInt: 1},
 		},
 		{
 			"structs and empty structs",
-			foo{Int: 1},
+			foo{FieldInt: 1},
 			foo{},
-			foo{Int: 1},
+			foo{FieldInt: 1},
 		},
 		{
 			"maps",
@@ -107,9 +107,9 @@ func Test_mainCoalescer_coalesceInterface(t *testing.T) {
 		},
 		{
 			"*structs",
-			&foo{Int: 1},
-			&foo{Int: 2},
-			&foo{Int: 2},
+			&foo{FieldInt: 1},
+			&foo{FieldInt: 2},
+			&foo{FieldInt: 2},
 		},
 		{
 			"different types",

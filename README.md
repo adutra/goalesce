@@ -404,8 +404,84 @@ See the [online documentation](https://pkg.go.dev/github.com/adutra/goalesce?tab
 
 ## Advanced usage
 
-The `Coalescer` interface allows for custom coalescing algorithms to be implemented. By passing custom coalescers to
-the `Coalesce` function, its behavior can be modified in any way.
+The `Coalescer` function allows for custom coalescing algorithms to be implemented. By passing custom coalescers as
+options to the `Coalesce` function, its behavior can be modified in any way.
+
+The following options allow to pass a custom coalescer to the `Coalesce` function:
+
+* The `WithTypeCoalescer` option can be used to coalesce a given type with a custom `Coalescer`.
+* The `WithFieldCoalescer` option can be used to coalesce a given struct field with a custom `Coalescer`.
+
+* Here is an example showcasing `WithTypeCoalescer`:
+
+```go
+func ExampleWithTypeCoalescer() {
+	userCoalescer := func(v1, v2 reflect.Value) (reflect.Value, error) {
+		if v1.FieldByName("ID").Int() == 1 {
+			return reflect.Value{}, errors.New("user 1 has been deleted")
+		}
+		return reflect.Value{}, nil // delegate to parent coalescer
+	}
+	{
+		v1 := User{ID: 1, Name: "Alice"}
+		v2 := User{ID: 1, Age: 20}
+		mainCoalescer := goalesce.NewCoalescer(goalesce.WithTypeCoalescer(reflect.TypeOf(User{}), userCoalescer))
+		coalesced, err := mainCoalescer(reflect.ValueOf(v1), reflect.ValueOf(v2))
+		fmt.Printf("Coalesce(%+v, %+v, WithTypeCoalescer) = %+v, %v\n", v1, v2, coalesced, err)
+	}
+	{
+		v1 := User{ID: 2, Name: "Bob"}
+		v2 := User{ID: 2, Age: 30}
+		mainCoalescer := goalesce.NewCoalescer(goalesce.WithTypeCoalescer(reflect.TypeOf(User{}), userCoalescer))
+		coalesced, err := mainCoalescer(reflect.ValueOf(v1), reflect.ValueOf(v2))
+		fmt.Printf("Coalesce(%+v, %+v, WithTypeCoalescer) = %+v, %v\n", v1, v2, coalesced, err)
+	}
+	// output:
+	// Coalesce({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithTypeCoalescer) = <invalid reflect.Value>, user 1 has been deleted
+	// Coalesce({ID:2 Name:Bob Age:0}, {ID:2 Name: Age:30}, WithTypeCoalescer) = {ID:2 Name:Bob Age:30}, <nil>
+}
+```
+
+It gets a bit more involved when the custom coalescer needs to access its parent coalescer, for example, to delegate the
+coalescing of child values.
+
+For these cases, there are 2 other options:
+
+* The `WithTypeCoalescerProvider` option can be used to coalesce a given type with a custom `Coalescer`.
+* The `WithFieldCoalescerProvider` option can be used to coalesce a given struct field with a custom `Coalescer`.
+
+The above options give the custom coalescer access to the parent coalescer. Here is an example showcasing
+`WithFieldCoalescerProvider`:
+
+```go
+func ExampleWithFieldCoalescerProvider() {
+	userCoalescerProvider := func(parent goalesce.Coalescer) goalesce.Coalescer {
+		return func(v1, v2 reflect.Value) (reflect.Value, error) {
+			if v1.Int() == 1 {
+				return reflect.Value{}, errors.New("user 1 has been deleted")
+			}
+			return parent(v1, v2) // use parent coalescer
+		}
+	}
+	{
+		v1 := User{ID: 1, Name: "Alice"}
+		v2 := User{ID: 1, Age: 20}
+		mainCoalescer := goalesce.NewCoalescer(goalesce.WithFieldCoalescerProvider(reflect.TypeOf(User{}), "ID", userCoalescerProvider))
+		coalesced, err := mainCoalescer(reflect.ValueOf(v1), reflect.ValueOf(v2))
+		fmt.Printf("Coalesce(%+v, %+v, WithFieldCoalescerProvider) = %+v, %v\n", v1, v2, coalesced, err)
+	}
+	{
+		v1 := User{ID: 2, Name: "Bob"}
+		v2 := User{ID: 2, Age: 30}
+		mainCoalescer := goalesce.NewCoalescer(goalesce.WithFieldCoalescerProvider(reflect.TypeOf(User{}), "ID", userCoalescerProvider))
+		coalesced, err := mainCoalescer(reflect.ValueOf(v1), reflect.ValueOf(v2))
+		fmt.Printf("Coalesce(%+v, %+v, WithFieldCoalescerProvider) = %+v, %v\n", v1, v2, coalesced, err)
+	}
+	// output:
+	// Coalesce({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithFieldCoalescerProvider) = <invalid reflect.Value>, user 1 has been deleted
+	// Coalesce({ID:2 Name:Bob Age:0}, {ID:2 Name: Age:30}, WithFieldCoalescerProvider) = {ID:2 Name:Bob Age:30}, <nil>
+}
+```
 
 [GoDocImg]: https://img.shields.io/badge/docs-golang-blue.svg
 [GoDocLink]: https://godoc.org/github.com/adutra/goalesce

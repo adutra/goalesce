@@ -20,35 +20,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewPointerCoalescer(t *testing.T) {
-	t.Run("no opts", func(t *testing.T) {
-		got := NewPointerCoalescer()
-		assert.Equal(t, &pointerCoalescer{fallback: &atomicCoalescer{}}, got)
-	})
-	t.Run("with generic option", func(t *testing.T) {
-		var passed *pointerCoalescer
-		opt := func(c *pointerCoalescer) {
-			passed = c
-		}
-		returned := NewPointerCoalescer(opt)
-		assert.Equal(t, &pointerCoalescer{fallback: &atomicCoalescer{}}, returned)
-		assert.Equal(t, returned, passed)
-	})
-	t.Run("with error on cycle", func(t *testing.T) {
-		expected := &pointerCoalescer{
-			onCycleReturnError: true,
-			fallback:           &atomicCoalescer{},
-		}
-		actual := NewPointerCoalescer(WithOnCycleReturnError())
-		assert.Equal(t, expected, actual)
-	})
-}
-
-func Test_pointerCoalescer_Coalesce(t *testing.T) {
+func Test_mainCoalescer_coalescePointer(t *testing.T) {
 	type foo struct {
 		Int int
 	}
@@ -156,37 +131,27 @@ func Test_pointerCoalescer_Coalesce(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			coalescer := NewPointerCoalescer()
-			coalescer.WithFallback(NewMainCoalescer())
-			got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+			coalescer := NewCoalescer()
+			got, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())
 		})
 	}
-	t.Run("type errors", func(t *testing.T) {
-		_, err := NewPointerCoalescer().Coalesce(reflect.ValueOf(intPtr(1)), reflect.ValueOf(stringPtr("a")))
-		assert.EqualError(t, err, "types do not match: *int != *string")
-		_, err = NewPointerCoalescer().Coalesce(reflect.ValueOf(1), reflect.ValueOf(2))
-		assert.EqualError(t, err, "values have wrong kind: expected ptr, got int")
-	})
 	t.Run("cycle errors", func(t *testing.T) {
 		withCycle := reflect.ValueOf(simpleCycle())
 		withoutCycle := reflect.ValueOf(&cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{Cycle: &cycle{}}}}})
-		coalescer := NewPointerCoalescer(WithOnCycleReturnError())
-		coalescer.WithFallback(NewMainCoalescer(WithPointerCoalescer(coalescer)))
-		_, err := coalescer.Coalesce(withCycle, withoutCycle)
+		coalescer := NewCoalescer(WithErrorOnCycle())
+		_, err := coalescer(withCycle, withoutCycle)
 		assert.EqualError(t, err, "*goalesce.cycle: cycle detected")
-		coalescer = NewPointerCoalescer(WithOnCycleReturnError())
-		coalescer.WithFallback(NewMainCoalescer(WithPointerCoalescer(coalescer)))
-		_, err = coalescer.Coalesce(withoutCycle, withCycle)
+		coalescer = NewCoalescer(WithErrorOnCycle())
+		_, err = coalescer(withoutCycle, withCycle)
 		assert.EqualError(t, err, "*goalesce.cycle: cycle detected")
 	})
 	t.Run("fallback error", func(t *testing.T) {
-		m := newMockCoalescer(t)
-		m.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.Value{}, errors.New("fake"))
-		coalescer := NewPointerCoalescer()
-		coalescer.WithFallback(m)
-		_, err := coalescer.Coalesce(reflect.ValueOf(intPtr(1)), reflect.ValueOf(intPtr(2)))
+		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return reflect.Value{}, errors.New("fake")
+		}))
+		_, err := coalescer(reflect.ValueOf(intPtr(1)), reflect.ValueOf(intPtr(2)))
 		assert.EqualError(t, err, "fake")
 	})
 }

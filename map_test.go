@@ -20,27 +20,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewMapCoalescer(t *testing.T) {
-	t.Run("no opts", func(t *testing.T) {
-		got := NewMapCoalescer()
-		assert.Equal(t, &mapCoalescer{fallback: &atomicCoalescer{}}, got)
-	})
-	t.Run("with generic option", func(t *testing.T) {
-		var passed *mapCoalescer
-		opt := func(c *mapCoalescer) {
-			passed = c
-		}
-		returned := NewMapCoalescer(opt)
-		assert.Equal(t, &mapCoalescer{fallback: &atomicCoalescer{}}, returned)
-		assert.Equal(t, returned, passed)
-	})
-}
-
-func Test_mapCoalescer_Coalesce(t *testing.T) {
+func Test_mainCoalescer_coalesceMap(t *testing.T) {
 	type foo struct {
 		Int int
 	}
@@ -243,7 +226,7 @@ func Test_mapCoalescer_Coalesce(t *testing.T) {
 			"map[string]*bar nested nils 2",
 			map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
 			map[string]*bar{"a": {nil}, "b": nil},
-			map[string]*bar{"a": {nil}, "b": {intPtr(2)}},
+			map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
 		},
 		{
 			"map[string]*bar non empty",
@@ -315,7 +298,7 @@ func Test_mapCoalescer_Coalesce(t *testing.T) {
 			"map[string]interface{} nested nils 2",
 			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
 			map[string]interface{}{"a": &bar{nil}, "b": nil},
-			map[string]interface{}{"a": &bar{nil}, "b": &bar{intPtr(2)}},
+			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
 		},
 		{
 			"map[string]interface{} non empty",
@@ -326,24 +309,17 @@ func Test_mapCoalescer_Coalesce(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			coalescer := NewMapCoalescer()
-			got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+			coalescer := NewCoalescer()
+			got, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())
 		})
 	}
-	t.Run("type errors", func(t *testing.T) {
-		_, err := NewMapCoalescer().Coalesce(reflect.ValueOf(map[string]int{"a": 2}), reflect.ValueOf(map[string]string{"a": "b"}))
-		assert.EqualError(t, err, "types do not match: map[string]int != map[string]string")
-		_, err = NewMapCoalescer().Coalesce(reflect.ValueOf(1), reflect.ValueOf(2))
-		assert.EqualError(t, err, "values have wrong kind: expected map, got int")
-	})
 	t.Run("fallback error", func(t *testing.T) {
-		coalescer := NewMapCoalescer()
-		m := newMockCoalescer(t)
-		m.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.Value{}, errors.New("fake"))
-		coalescer.WithFallback(m)
-		_, err := coalescer.Coalesce(reflect.ValueOf(map[string]int{"a": 2}), reflect.ValueOf(map[string]int{"a": 2}))
+		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return reflect.Value{}, errors.New("fake")
+		}))
+		_, err := coalescer(reflect.ValueOf(map[string]int{"a": 2}), reflect.ValueOf(map[string]int{"a": 2}))
 		assert.EqualError(t, err, "fake")
 	})
 }

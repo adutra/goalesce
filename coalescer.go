@@ -18,18 +18,57 @@ import (
 	"reflect"
 )
 
-// Coalescer is the main interface for coalescing objects. Simple usages of this package do not need to implement this
-// interface. Implementing this interface is considered an advanced usage.
-type Coalescer interface {
+// Coalescer is the main function for coalescing objects. Simple usages of this package do not need to implement this
+// function. Implementing this function is considered an advanced usage.
+// A coalescer function coalesces the 2 values into a single value, favoring v2 over v1 in case of conflicts. Note that
+// the passed values can be zero-values, but will never be invalid values.
+// When a coalescer function returns an invalid value and a nil error, it is assumed that the function is delegating the
+// coalescing to its parent, if any.
+type Coalescer func(v1, v2 reflect.Value) (reflect.Value, error)
 
-	// Coalesce coalesces the 2 values into a single value. All built-in implementations of this interface favor v2 over
-	// v1 in case of conflicts. Note that the passed values can be zero-values, but will never be invalid values; it is
-	// also expected that implementors will never return invalid values if the returned error is nil.
-	Coalesce(v1, v2 reflect.Value) (reflect.Value, error)
+// NewCoalescer creates a new coalescer with the given options.
+func NewCoalescer(opts ...CoalescerOption) Coalescer {
+	c := &mainCoalescer{}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c.coalesce
+}
 
-	// WithFallback sets the fallback Coalescer for this coalescer. This is used in case this coalescer only handles one
-	// specific type, and needs to call another coalescer to handle other types encountered during merge. Any Coalescer
-	// implementation passed to the Coalesce function will have its WithFallback method called with the main Coalescer
-	// before the coalescing operation begins. Simple Coalescers can implement this method as a no-op.
-	WithFallback(fallback Coalescer)
+type mainCoalescer struct {
+	typeCoalescers  map[reflect.Type]Coalescer
+	sliceCoalescer  Coalescer
+	sliceCoalescers map[ /* slice type */ reflect.Type]Coalescer
+	fieldCoalescers map[ /* struct type */ reflect.Type]map[ /* field name */ string]Coalescer
+	zeroEmptySlice  bool
+	errorOnCycle    bool
+	seen            map[uintptr]bool
+}
+
+func (c *mainCoalescer) coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
+	if err := checkTypesMatch(v1, v2); err != nil {
+		return reflect.Value{}, err
+	}
+	if coalescer, found := c.typeCoalescers[v1.Type()]; found {
+		value, err := coalescer(v1, v2)
+		if value.IsValid() || err != nil {
+			return value, err
+		}
+	}
+	if value, done := checkZero(v1, v2); done {
+		return value, nil
+	}
+	switch v1.Type().Kind() {
+	case reflect.Interface:
+		return c.coalesceInterface(v1, v2)
+	case reflect.Ptr:
+		return c.coalescePointer(v1, v2)
+	case reflect.Map:
+		return c.coalesceMap(v1, v2)
+	case reflect.Struct:
+		return c.coalesceStruct(v1, v2)
+	case reflect.Slice:
+		return c.coalesceSlice(v1, v2)
+	}
+	return coalesceAtomic(v1, v2)
 }

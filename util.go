@@ -52,12 +52,3 @@ func checkTypesMatch(v1, v2 reflect.Value) error {
 	}
 	return nil
 }
-
-func checkTypesMatchWithKind(v1, v2 reflect.Value, kind reflect.Kind) error {
-	if err := checkTypesMatch(v1, v2); err != nil {
-		return err
-	} else if v1.Kind() != kind {
-		return fmt.Errorf("values have wrong kind: expected %s, got %s", kind, v1.Kind())
-	}
-	return nil
-}

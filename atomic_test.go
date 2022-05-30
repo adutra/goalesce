@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_defaultCoalescer_Coalesce(t *testing.T) {
+func Test_coalesceAtomic(t *testing.T) {
 	type foo struct {
 		Int int
 	}
@@ -226,8 +226,7 @@ func Test_defaultCoalescer_Coalesce(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &atomicCoalescer{}
-			got, err := c.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+			got, err := coalesceAtomic(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())
 		})

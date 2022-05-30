@@ -18,43 +18,12 @@ import (
 	"reflect"
 )
 
-// InterfaceCoalescerOption is an option to be passed to NewInterfaceCoalescer. There is currently no available built-in
-// option, but this could change in the future.
-type InterfaceCoalescerOption func(c *interfaceCoalescer)
-
-// NewInterfaceCoalescer creates a new Coalescer for interface types. If both values to coalesce are non-nil, the
-// returned coalescer will coalesce the interfaces' underlying values, if they are of the same type; otherwise, it will
-// apply atomic semantics and return the second value.
-func NewInterfaceCoalescer(opts ...InterfaceCoalescerOption) Coalescer {
-	c := &interfaceCoalescer{
-		fallback: &atomicCoalescer{},
-	}
-	for _, opt := range opts {
-		opt(c)
-	}
-	return c
-}
-
-type interfaceCoalescer struct {
-	fallback Coalescer
-}
-
-func (c *interfaceCoalescer) WithFallback(fallback Coalescer) {
-	c.fallback = fallback
-}
-
-func (c *interfaceCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
-	if err := checkTypesMatchWithKind(v1, v2, reflect.Interface); err != nil {
-		return reflect.Value{}, err
-	}
-	if value, done := checkZero(v1, v2); done {
-		return value, nil
-	}
+func (c *mainCoalescer) coalesceInterface(v1, v2 reflect.Value) (reflect.Value, error) {
 	if v1.Elem().Type() != v2.Elem().Type() {
 		return v2, nil
 	}
 	coalesced := reflect.New(v1.Type())
-	coalescedTarget, err := c.fallback.Coalesce(v1.Elem(), v2.Elem())
+	coalescedTarget, err := c.coalesce(v1.Elem(), v2.Elem())
 	if err != nil {
 		return reflect.Value{}, err
 	}

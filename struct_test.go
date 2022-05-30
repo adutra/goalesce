@@ -499,3 +499,41 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 		assert.EqualError(t, err, "fake")
 	})
 }
+
+func Test_newMergeByField(t *testing.T) {
+	type User struct {
+		ID   int
+		Name *string
+	}
+	u := User{ID: 1, Name: stringPtr("Alice")}
+	t.Run("on struct", func(t *testing.T) {
+		mergeKeyFunc := newMergeByField("ID")
+		mergeKey := mergeKeyFunc(-1, reflect.ValueOf(u))
+		assert.Equal(t, 1, mergeKey.Interface())
+	})
+	t.Run("on pointer to struct", func(t *testing.T) {
+		mergeKeyFunc := newMergeByField("ID")
+		mergeKey := mergeKeyFunc(-1, reflect.ValueOf(&u))
+		assert.Equal(t, 1, mergeKey.Interface())
+	})
+	t.Run("on pointer field", func(t *testing.T) {
+		mergeKeyFunc := newMergeByField("Name")
+		mergeKey := mergeKeyFunc(-1, reflect.ValueOf(u))
+		assert.Equal(t, "Alice", mergeKey.String())
+	})
+	t.Run("on pointer to struct and pointer field", func(t *testing.T) {
+		mergeKeyFunc := newMergeByField("Name")
+		mergeKey := mergeKeyFunc(-1, reflect.ValueOf(&u))
+		assert.Equal(t, "Alice", mergeKey.String())
+	})
+	t.Run("invalid field", func(t *testing.T) {
+		assert.Panics(t, func() {
+			mergeKeyFunc := newMergeByField("NonExistent")
+			mergeKeyFunc(-1, reflect.ValueOf(u))
+		})
+		assert.Panics(t, func() {
+			mergeKeyFunc := newMergeByField("NonExistent")
+			mergeKeyFunc(-1, reflect.ValueOf(&u))
+		})
+	})
+}

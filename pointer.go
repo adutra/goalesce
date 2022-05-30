@@ -19,51 +19,15 @@ import (
 	"reflect"
 )
 
-// PointerCoalescerOption is an option to be passed to NewPointerCoalescer. There is currently no available built-in
-// option, but this could change in the future.
-type PointerCoalescerOption func(c *pointerCoalescer)
-
-// NewPointerCoalescer creates a new Coalescer for pointer types.
-func NewPointerCoalescer(opts ...PointerCoalescerOption) Coalescer {
-	c := &pointerCoalescer{
-		fallback: &atomicCoalescer{},
-	}
-	for _, opt := range opts {
-		opt(c)
-	}
-	return c
-}
-
-// WithOnCycleReturnError instructs the coalescer to return an error when a cycle is detected. By default, the coalescer
-// replaces cycles with a nil pointer.
-func WithOnCycleReturnError() PointerCoalescerOption {
-	return func(c *pointerCoalescer) {
-		c.onCycleReturnError = true
-	}
-}
-
-type pointerCoalescer struct {
-	fallback           Coalescer
-	seen               map[uintptr]bool
-	onCycleReturnError bool
-}
-
-func (c *pointerCoalescer) WithFallback(fallback Coalescer) {
-	c.fallback = fallback
-}
-
-func (c *pointerCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
-	if err := checkTypesMatchWithKind(v1, v2, reflect.Ptr); err != nil {
-		return reflect.Value{}, err
-	}
+func (c *mainCoalescer) coalescePointer(v1, v2 reflect.Value) (reflect.Value, error) {
 	if c.checkCycle(v1) {
-		if c.onCycleReturnError {
+		if c.errorOnCycle {
 			return reflect.Value{}, fmt.Errorf("%s: cycle detected", v1.Type().String())
 		}
 		v1 = reflect.Zero(v1.Type())
 	}
 	if c.checkCycle(v2) {
-		if c.onCycleReturnError {
+		if c.errorOnCycle {
 			return reflect.Value{}, fmt.Errorf("%s: cycle detected", v2.Type().String())
 		}
 		v2 = reflect.Zero(v2.Type())
@@ -72,7 +36,7 @@ func (c *pointerCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error)
 		return value, nil
 	}
 	coalesced := reflect.New(v1.Elem().Type())
-	coalescedTarget, err := c.fallback.Coalesce(v1.Elem(), v2.Elem())
+	coalescedTarget, err := c.coalesce(v1.Elem(), v2.Elem())
 	if err != nil {
 		return reflect.Value{}, err
 	}
@@ -80,7 +44,7 @@ func (c *pointerCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error)
 	return coalesced, nil
 }
 
-func (c *pointerCoalescer) checkCycle(v reflect.Value) bool {
+func (c *mainCoalescer) checkCycle(v reflect.Value) bool {
 	if v.CanAddr() {
 		if c.seen == nil {
 			c.seen = make(map[uintptr]bool)

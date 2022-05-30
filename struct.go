@@ -36,67 +36,14 @@ const (
 	CoalesceStrategyMerge = "merge"
 )
 
-// StructCoalescerOption is an option to be passed to NewStructCoalescer.
-type StructCoalescerOption func(c *structCoalescer)
-
-// NewStructCoalescer creates a new Coalescer for structs.
-func NewStructCoalescer(opts ...StructCoalescerOption) Coalescer {
-	c := &structCoalescer{
-		fallback: &atomicCoalescer{},
-	}
-	for _, opt := range opts {
-		opt(c)
-	}
-	return c
-}
-
-// WithFieldCoalescer uses the given Coalescer to coalesce the given struct field.
-func WithFieldCoalescer(t reflect.Type, field string, coalescer Coalescer) StructCoalescerOption {
-	return func(c *structCoalescer) {
-		if c.fieldCoalescers == nil {
-			c.fieldCoalescers = make(map[reflect.Type]map[string]Coalescer)
-		}
-		if c.fieldCoalescers[t] == nil {
-			c.fieldCoalescers[t] = make(map[string]Coalescer)
-		}
-		c.fieldCoalescers[t][field] = coalescer
-	}
-}
-
-// WithAtomicField causes the given field to be coalesced atomically, that is, with  "atomic" semantics, instead of its
-// default coalesce semantics. When 2 non-zero-values of this field are coalesced, the second value is returned as is.
-func WithAtomicField(t reflect.Type, field string) StructCoalescerOption {
-	return WithFieldCoalescer(t, field, NewAtomicCoalescer())
-}
-
-type structCoalescer struct {
-	fallback        Coalescer
-	fieldCoalescers map[reflect.Type]map[string]Coalescer
-}
-
-func (c *structCoalescer) WithFallback(fallback Coalescer) {
-	c.fallback = fallback
-	for _, coalescers := range c.fieldCoalescers {
-		for _, coalescer := range coalescers {
-			coalescer.WithFallback(fallback)
-		}
-	}
-}
-
-func (c *structCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
-	if err := checkTypesMatchWithKind(v1, v2, reflect.Struct); err != nil {
-		return reflect.Value{}, err
-	}
-	if value, done := checkZero(v1, v2); done {
-		return value, nil
-	}
+func (c *mainCoalescer) coalesceStruct(v1, v2 reflect.Value) (reflect.Value, error) {
 	coalesced := reflect.New(v1.Type()).Elem()
 	for i := 0; i < v1.NumField(); i++ {
 		field := v1.Type().Field(i)
 		if field.IsExported() {
 			if fieldCoalescer, err := c.fieldCoalescer(v1.Type(), field); err != nil {
 				return reflect.Value{}, err
-			} else if coalescedField, err := fieldCoalescer.Coalesce(v1.Field(i), v2.Field(i)); err != nil {
+			} else if coalescedField, err := fieldCoalescer(v1.Field(i), v2.Field(i)); err != nil {
 				return reflect.Value{}, err
 			} else {
 				coalesced.Field(i).Set(coalescedField)
@@ -106,7 +53,7 @@ func (c *structCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) 
 	return coalesced, nil
 }
 
-func (c *structCoalescer) fieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
+func (c *mainCoalescer) fieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
 	fieldCoalescer, err := c.fieldCoalescerFromTag(structType, field)
 	if err != nil {
 		return nil, err
@@ -117,19 +64,19 @@ func (c *structCoalescer) fieldCoalescer(structType reflect.Type, field reflect.
 		}
 	}
 	if fieldCoalescer == nil {
-		fieldCoalescer = c.fallback
+		fieldCoalescer = c.coalesce
 	}
 	return fieldCoalescer, nil
 }
 
-func (c *structCoalescer) fieldCoalescerFromTag(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
+func (c *mainCoalescer) fieldCoalescerFromTag(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
 	coalesceStrategy, found := field.Tag.Lookup(CoalesceStrategyTag)
 	if !found {
 		return nil, nil
 	}
 	switch {
 	case coalesceStrategy == CoalesceStrategyAtomic:
-		return NewAtomicCoalescer(), nil
+		return coalesceAtomic, nil
 	case coalesceStrategy == CoalesceStrategyAppend:
 		return c.appendFieldCoalescer(structType, field)
 	case coalesceStrategy == CoalesceStrategyUnion:
@@ -142,34 +89,32 @@ func (c *structCoalescer) fieldCoalescerFromTag(structType reflect.Type, field r
 	return nil, fmt.Errorf("field %s.%s: unknown coalesce strategy: %s", structType.String(), field.Name, coalesceStrategy)
 }
 
-func (c *structCoalescer) appendFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
+func (c *mainCoalescer) appendFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
 	if field.Type.Kind() != reflect.Slice {
 		return nil, fmt.Errorf("field %s.%s: append strategy is only supported for slices", structType.String(), field.Name)
 	}
-	return &sliceAppendCoalescer{}, nil
+	return coalesceSliceAppend, nil
 }
 
-func (c *structCoalescer) unionFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
+func (c *mainCoalescer) unionFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
 	if field.Type.Kind() != reflect.Slice {
 		return nil, fmt.Errorf("field %s.%s: union strategy is only supported for slices", structType.String(), field.Name)
 	}
-	return &sliceMergeCoalescer{
-		fallback:     c.fallback,
-		mergeKeyFunc: SliceUnion,
+	return func(v1, v2 reflect.Value) (reflect.Value, error) {
+		return c.coalesceSliceMerge(v1, v2, SliceUnion)
 	}, nil
 }
 
-func (c *structCoalescer) indexFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
+func (c *mainCoalescer) indexFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
 	if field.Type.Kind() != reflect.Slice {
 		return nil, fmt.Errorf("field %s.%s: index strategy is only supported for slices", structType.String(), field.Name)
 	}
-	return &sliceMergeCoalescer{
-		fallback:     c.fallback,
-		mergeKeyFunc: SliceIndex,
+	return func(v1, v2 reflect.Value) (reflect.Value, error) {
+		return c.coalesceSliceMerge(v1, v2, SliceIndex)
 	}, nil
 }
 
-func (c *structCoalescer) mergeFieldCoalescer(structType reflect.Type, field reflect.StructField, strategy string) (Coalescer, error) {
+func (c *mainCoalescer) mergeFieldCoalescer(structType reflect.Type, field reflect.StructField, strategy string) (Coalescer, error) {
 	if field.Type.Kind() != reflect.Slice {
 		return nil, fmt.Errorf("field %s.%s: merge strategy is only supported for slices", structType.String(), field.Name)
 	}
@@ -186,8 +131,21 @@ func (c *structCoalescer) mergeFieldCoalescer(structType reflect.Type, field ref
 	} else if _, found := elemType.FieldByName(key); !found {
 		return nil, fmt.Errorf("field %s.%s: slice element type %s has no field named %s", structType.String(), field.Name, elemType.String(), key)
 	}
-	return &sliceMergeCoalescer{
-		fallback:     c.fallback,
-		mergeKeyFunc: newMergeByField(key),
+	return func(v1, v2 reflect.Value) (reflect.Value, error) {
+		return c.coalesceSliceMerge(v1, v2, newMergeByField(key))
 	}, nil
+}
+
+// newMergeByField returns a SliceMergeKeyFunc that returns the value of the given struct field for each slice element.
+// This function is designed to work on slices of structs, and slices of pointers to structs. When this function
+// encounters a pointer while extracting the merge key, it dereferences the pointer; if the pointer was nil, a zero
+// value will be used instead, but beware that this may result in nondeterministic merge results.
+func newMergeByField(field string) SliceMergeKeyFunc {
+	return func(_ int, elem reflect.Value) reflect.Value {
+		// the slice element itself may be a pointer; we want to dereference it and return a zero-value if it's nil.
+		elem = safeIndirect(elem)
+		// the slice element's field may also be a pointer; again, we want to dereference it and return a zero-value
+		// if it's nil.
+		return safeIndirect(elem.FieldByName(field))
+	}
 }

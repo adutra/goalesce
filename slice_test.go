@@ -20,63 +20,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewSliceCoalescer(t *testing.T) {
-	t.Run("no opts", func(t *testing.T) {
-		got := NewSliceCoalescer()
-		assert.Equal(t, &sliceCoalescer{defaultCoalescer: &atomicCoalescer{}}, got)
-	})
-	t.Run("with generic option", func(t *testing.T) {
-		var passed *sliceCoalescer
-		opt := func(c *sliceCoalescer) {
-			passed = c
-		}
-		returned := NewSliceCoalescer(opt)
-		assert.Equal(t, &sliceCoalescer{defaultCoalescer: &atomicCoalescer{}}, returned)
-		assert.Equal(t, returned, passed)
-	})
-	t.Run("with default union", func(t *testing.T) {
-		got := NewSliceCoalescer(WithDefaultSetUnion())
-		assert.IsType(t, &sliceMergeCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
-	})
-	t.Run("with default append", func(t *testing.T) {
-		got := NewSliceCoalescer(WithDefaultListAppend())
-		assert.Equal(t, &sliceCoalescer{defaultCoalescer: &sliceAppendCoalescer{}}, got)
-	})
-	t.Run("with append", func(t *testing.T) {
-		got := NewSliceCoalescer(WithListAppend(reflect.TypeOf("")))
-		assert.Equal(t, &atomicCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
-		assert.Equal(t, &sliceAppendCoalescer{}, got.(*sliceCoalescer).elemCoalescers[reflect.TypeOf("")])
-	})
-	t.Run("with merge by union", func(t *testing.T) {
-		got := NewSliceCoalescer(WithSetUnion(reflect.TypeOf(0)))
-		assert.Equal(t, &atomicCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
-		assert.IsType(t, &sliceMergeCoalescer{}, got.(*sliceCoalescer).elemCoalescers[reflect.TypeOf(0)])
-	})
-	t.Run("with merge by field", func(t *testing.T) {
-		type foo struct {
-			Int int
-		}
-		got := NewSliceCoalescer(WithMergeByField(reflect.TypeOf(foo{}), "Int"))
-		assert.Equal(t, &atomicCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
-		assert.IsType(t, &sliceMergeCoalescer{}, got.(*sliceCoalescer).elemCoalescers[reflect.TypeOf(foo{})])
-	})
-	t.Run("with merge by key", func(t *testing.T) {
-		type foo struct {
-			Int int
-		}
-		got := NewSliceCoalescer(WithMergeByKey(reflect.TypeOf(foo{}), func(_ int, value reflect.Value) reflect.Value {
-			return reflect.ValueOf(value.Interface().(foo).Int)
-		}))
-		assert.Equal(t, &atomicCoalescer{}, got.(*sliceCoalescer).defaultCoalescer)
-		assert.IsType(t, &sliceMergeCoalescer{}, got.(*sliceCoalescer).elemCoalescers[reflect.TypeOf(foo{})])
-	})
-}
-
-func Test_sliceCoalescer_Coalesce(t *testing.T) {
+func Test_mainCoalescer_coalesceSlice(t *testing.T) {
 	type foo struct {
 		Int int
 	}
@@ -116,7 +63,7 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 		name string
 		v1   interface{}
 		v2   interface{}
-		opt  []SliceCoalescerOption
+		opt  []CoalescerOption
 		want interface{}
 	}{
 		{
@@ -172,98 +119,98 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			"[]int union zero",
 			[]int(nil),
 			[]int(nil),
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]int(nil),
 		},
 		{
 			"[]int union mixed zero",
 			[]int{},
 			[]int(nil),
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]int{},
 		},
 		{
 			"[]int union mixed zero 2",
 			[]int(nil),
 			[]int{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]int{},
 		},
 		{
 			"[]int union empty",
 			[]int{},
 			[]int{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]int{},
 		},
 		{
 			"[]int union mixed empty",
 			[]int{1},
 			[]int{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]int{1},
 		},
 		{
 			"[]int union mixed empty 2",
 			[]int{},
 			[]int{2},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]int{2},
 		},
 		{
 			"[]int union non empty",
 			[]int{1, 2, 3},
 			[]int{3, 4, 5},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]int{1, 2, 3, 4, 5},
 		},
 		{
 			"[]int append zero",
 			[]int(nil),
 			[]int(nil),
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]int(nil),
 		},
 		{
 			"[]int append mixed zero",
 			[]int{},
 			[]int(nil),
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]int{},
 		},
 		{
 			"[]int append mixed zero 2",
 			[]int(nil),
 			[]int{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]int{},
 		},
 		{
 			"[]int append empty",
 			[]int{},
 			[]int{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]int{},
 		},
 		{
 			"[]int append mixed empty",
 			[]int{1},
 			[]int{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]int{1},
 		},
 		{
 			"[]int append mixed empty 2",
 			[]int{},
 			[]int{2},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]int{2},
 		},
 		{
 			"[]int append non empty",
 			[]int{1, 2, 3},
 			[]int{3, 4, 5},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]int{1, 2, 3, 3, 4, 5},
 		},
 		{
@@ -319,98 +266,98 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			"[]*int union zero",
 			[]*int(nil),
 			[]*int(nil),
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*int(nil),
 		},
 		{
 			"[]*int union mixed zero",
 			[]*int{},
 			[]*int(nil),
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*int{},
 		},
 		{
 			"[]*int union mixed zero 2",
 			[]*int(nil),
 			[]*int{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*int{},
 		},
 		{
 			"[]*int union empty",
 			[]*int{},
 			[]*int{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*int{},
 		},
 		{
 			"[]*int union mixed empty",
 			[]*int{intPtr(1)},
 			[]*int{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*int{intPtr(1)},
 		},
 		{
 			"[]*int union mixed empty 2",
 			[]*int{},
 			[]*int{intPtr(2)},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*int{intPtr(2)},
 		},
 		{
 			"[]*int union non empty",
 			[]*int{intPtr(1), intPtr(2), nil},
 			[]*int{intPtr(2), intPtr(4), intPtr(5), nil},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*int{intPtr(1), intPtr(2), nil, intPtr(4), intPtr(5)},
 		},
 		{
 			"[]*int append zero",
 			[]*int(nil),
 			[]*int(nil),
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*int(nil),
 		},
 		{
 			"[]*int append mixed zero",
 			[]*int{},
 			[]*int(nil),
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*int{},
 		},
 		{
 			"[]*int append mixed zero 2",
 			[]*int(nil),
 			[]*int{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*int{},
 		},
 		{
 			"[]*int append empty",
 			[]*int{},
 			[]*int{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*int{},
 		},
 		{
 			"[]*int append mixed empty",
 			[]*int{intPtr(1)},
 			[]*int{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*int{intPtr(1)},
 		},
 		{
 			"[]*int append mixed empty 2",
 			[]*int{},
 			[]*int{intPtr(2)},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*int{intPtr(2)},
 		},
 		{
 			"[]*int append non empty",
 			[]*int{intPtr(1), intPtr(2), nil},
 			[]*int{intPtr(2), intPtr(4), intPtr(5), nil},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*int{intPtr(1), intPtr(2), nil, intPtr(2), intPtr(4), intPtr(5), nil},
 		},
 
@@ -467,406 +414,406 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			"[]foo union zero",
 			[]foo(nil),
 			[]foo(nil),
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]foo(nil),
 		},
 		{
 			"[]foo union mixed zero",
 			[]foo{},
 			[]foo(nil),
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]foo{},
 		},
 		{
 			"[]foo union mixed zero 2",
 			[]foo(nil),
 			[]foo{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]foo{},
 		},
 		{
 			"[]foo union empty",
 			[]foo{},
 			[]foo{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]foo{},
 		},
 		{
 			"[]foo union mixed empty",
 			[]foo{{Int: 1}},
 			[]foo{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]foo{{Int: 1}},
 		},
 		{
 			"[]foo union mixed empty 2",
 			[]foo{},
 			[]foo{{Int: 2}},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]foo{{Int: 2}},
 		},
 		{
 			"[]foo union non empty",
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]foo{{Int: 3}, {Int: 4}, {Int: 5}},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 4}, {Int: 5}},
 		},
 		{
 			"[]foo custom union zero",
 			[]foo(nil),
 			[]foo(nil),
-			[]SliceCoalescerOption{WithSetUnion(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]foo{}))},
 			[]foo(nil),
 		},
 		{
 			"[]foo custom union mixed zero",
 			[]foo{},
 			[]foo(nil),
-			[]SliceCoalescerOption{WithSetUnion(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]foo{}))},
 			[]foo{},
 		},
 		{
 			"[]foo custom union mixed zero 2",
 			[]foo(nil),
 			[]foo{},
-			[]SliceCoalescerOption{WithSetUnion(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]foo{}))},
 			[]foo{},
 		},
 		{
 			"[]foo custom union empty",
 			[]foo{},
 			[]foo{},
-			[]SliceCoalescerOption{WithSetUnion(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]foo{}))},
 			[]foo{},
 		},
 		{
 			"[]foo custom union mixed empty",
 			[]foo{{Int: 1}},
 			[]foo{},
-			[]SliceCoalescerOption{WithSetUnion(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]foo{}))},
 			[]foo{{Int: 1}},
 		},
 		{
 			"[]foo custom union mixed empty 2",
 			[]foo{},
 			[]foo{{Int: 2}},
-			[]SliceCoalescerOption{WithSetUnion(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]foo{}))},
 			[]foo{{Int: 2}},
 		},
 		{
 			"[]foo custom union non empty",
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]foo{{Int: 3}, {Int: 4}, {Int: 5}},
-			[]SliceCoalescerOption{WithSetUnion(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]foo{}))},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 4}, {Int: 5}},
 		},
 		{
 			"[]foo field zero",
 			[]foo(nil),
 			[]foo(nil),
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(foo{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "Int")},
 			[]foo(nil),
 		},
 		{
 			"[]foo field mixed zero",
 			[]foo{},
 			[]foo(nil),
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(foo{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "Int")},
 			[]foo{},
 		},
 		{
 			"[]foo field mixed zero 2",
 			[]foo(nil),
 			[]foo{},
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(foo{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "Int")},
 			[]foo{},
 		},
 		{
 			"[]foo field empty",
 			[]foo{},
 			[]foo{},
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(foo{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "Int")},
 			[]foo{},
 		},
 		{
 			"[]foo field mixed empty",
 			[]foo{{Int: 1}},
 			[]foo{},
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(foo{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "Int")},
 			[]foo{{Int: 1}},
 		},
 		{
 			"[]foo field mixed empty 2",
 			[]foo{},
 			[]foo{{Int: 2}},
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(foo{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "Int")},
 			[]foo{{Int: 2}},
 		},
 		{
 			"[]foo field non empty",
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]foo{{Int: 3}, {Int: 4}, {Int: 5}},
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(foo{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "Int")},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 4}, {Int: 5}},
 		},
 		{
 			"[]foo merge key zero",
 			[]foo(nil),
 			[]foo(nil),
-			[]SliceCoalescerOption{WithMergeByKey(reflect.TypeOf(foo{}), fooMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]foo{}), fooMergeFunc)},
 			[]foo(nil),
 		},
 		{
 			"[]foo merge key mixed zero",
 			[]foo{},
 			[]foo(nil),
-			[]SliceCoalescerOption{WithMergeByKey(reflect.TypeOf(foo{}), fooMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]foo{}), fooMergeFunc)},
 			[]foo{},
 		},
 		{
 			"[]foo merge key mixed zero 2",
 			[]foo(nil),
 			[]foo{},
-			[]SliceCoalescerOption{WithMergeByKey(reflect.TypeOf(foo{}), fooMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]foo{}), fooMergeFunc)},
 			[]foo{},
 		},
 		{
 			"[]foo merge key empty",
 			[]foo{},
 			[]foo{},
-			[]SliceCoalescerOption{WithMergeByKey(reflect.TypeOf(foo{}), fooMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]foo{}), fooMergeFunc)},
 			[]foo{},
 		},
 		{
 			"[]foo merge key mixed empty",
 			[]foo{{Int: 1}},
 			[]foo{},
-			[]SliceCoalescerOption{WithMergeByKey(reflect.TypeOf(foo{}), fooMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]foo{}), fooMergeFunc)},
 			[]foo{{Int: 1}},
 		},
 		{
 			"[]foo merge key mixed empty 2",
 			[]foo{},
 			[]foo{{Int: 2}},
-			[]SliceCoalescerOption{WithMergeByKey(reflect.TypeOf(foo{}), fooMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]foo{}), fooMergeFunc)},
 			[]foo{{Int: 2}},
 		},
 		{
 			"[]foo merge key non empty",
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]foo{{Int: 3}, {Int: 4}, {Int: 5}},
-			[]SliceCoalescerOption{WithMergeByKey(reflect.TypeOf(foo{}), fooMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]foo{}), fooMergeFunc)},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 4}, {Int: 5}},
 		},
 		{
 			"[]foo default merge by index zero",
 			[]foo(nil),
 			[]foo(nil),
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]foo(nil),
 		},
 		{
 			"[]foo default merge by index mixed zero",
 			[]foo{},
 			[]foo(nil),
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]foo{},
 		},
 		{
 			"[]foo default merge by index mixed zero 2",
 			[]foo(nil),
 			[]foo{},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]foo{},
 		},
 		{
 			"[]foo default merge by index empty",
 			[]foo{},
 			[]foo{},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]foo{},
 		},
 		{
 			"[]foo default merge by index mixed empty",
 			[]foo{{Int: 1}},
 			[]foo{},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]foo{{Int: 1}},
 		},
 		{
 			"[]foo default merge by index mixed empty 2",
 			[]foo{},
 			[]foo{{Int: 2}},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]foo{{Int: 2}},
 		},
 		{
 			"[]foo default merge by index non empty 1",
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]foo{{Int: 4}, {Int: 5}},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]foo{{Int: 4}, {Int: 5}, {Int: 3}},
 		},
 		{
 			"[]foo default merge by index non empty 2",
 			[]foo{{Int: 4}, {Int: 5}},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 		},
 		{
 			"[]foo merge by index zero",
 			[]foo(nil),
 			[]foo(nil),
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]foo{}))},
 			[]foo(nil),
 		},
 		{
 			"[]foo merge by index mixed zero",
 			[]foo{},
 			[]foo(nil),
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]foo{}))},
 			[]foo{},
 		},
 		{
 			"[]foo merge by index mixed zero 2",
 			[]foo(nil),
 			[]foo{},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]foo{}))},
 			[]foo{},
 		},
 		{
 			"[]foo merge by index empty",
 			[]foo{},
 			[]foo{},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]foo{}))},
 			[]foo{},
 		},
 		{
 			"[]foo merge by index mixed empty",
 			[]foo{{Int: 1}},
 			[]foo{},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]foo{}))},
 			[]foo{{Int: 1}},
 		},
 		{
 			"[]foo merge by index mixed empty 2",
 			[]foo{},
 			[]foo{{Int: 2}},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]foo{}))},
 			[]foo{{Int: 2}},
 		},
 		{
 			"[]foo merge by index non empty 1",
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]foo{{Int: 4}, {Int: 5}},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]foo{}))},
 			[]foo{{Int: 4}, {Int: 5}, {Int: 3}},
 		},
 		{
 			"[]foo merge by index non empty 2",
 			[]foo{{Int: 4}, {Int: 5}},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]foo{}))},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 		},
 		{
 			"[]foo append zero",
 			[]foo(nil),
 			[]foo(nil),
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]foo(nil),
 		},
 		{
 			"[]foo append mixed zero",
 			[]foo{},
 			[]foo(nil),
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]foo{},
 		},
 		{
 			"[]foo append mixed zero 2",
 			[]foo(nil),
 			[]foo{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]foo{},
 		},
 		{
 			"[]foo append empty",
 			[]foo{},
 			[]foo{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]foo{},
 		},
 		{
 			"[]foo append mixed empty",
 			[]foo{{Int: 1}},
 			[]foo{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]foo{{Int: 1}},
 		},
 		{
 			"[]foo append mixed empty 2",
 			[]foo{},
 			[]foo{{Int: 2}},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]foo{{Int: 2}},
 		},
 		{
 			"[]foo append non empty",
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]foo{{Int: 3}, {Int: 4}, {Int: 5}},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 3}, {Int: 4}, {Int: 5}},
 		},
 		{
 			"[]foo custom append zero",
 			[]foo(nil),
 			[]foo(nil),
-			[]SliceCoalescerOption{WithListAppend(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]foo{}))},
 			[]foo(nil),
 		},
 		{
 			"[]foo custom append mixed zero",
 			[]foo{},
 			[]foo(nil),
-			[]SliceCoalescerOption{WithListAppend(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]foo{}))},
 			[]foo{},
 		},
 		{
 			"[]foo custom append mixed zero 2",
 			[]foo(nil),
 			[]foo{},
-			[]SliceCoalescerOption{WithListAppend(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]foo{}))},
 			[]foo{},
 		},
 		{
 			"[]foo custom append empty",
 			[]foo{},
 			[]foo{},
-			[]SliceCoalescerOption{WithListAppend(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]foo{}))},
 			[]foo{},
 		},
 		{
 			"[]foo custom append mixed empty",
 			[]foo{{Int: 1}},
 			[]foo{},
-			[]SliceCoalescerOption{WithListAppend(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]foo{}))},
 			[]foo{{Int: 1}},
 		},
 		{
 			"[]foo custom append mixed empty 2",
 			[]foo{},
 			[]foo{{Int: 2}},
-			[]SliceCoalescerOption{WithListAppend(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]foo{}))},
 			[]foo{{Int: 2}},
 		},
 		{
 			"[]foo custom append non empty",
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]foo{{Int: 3}, {Int: 4}, {Int: 5}},
-			[]SliceCoalescerOption{WithListAppend(reflect.TypeOf(foo{}))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]foo{}))},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 3}, {Int: 4}, {Int: 5}},
 		},
 		{
@@ -922,196 +869,196 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			"[]*bar union zero",
 			[]*bar(nil),
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*bar(nil),
 		},
 		{
 			"[]*bar union mixed zero",
 			[]*bar{},
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*bar{},
 		},
 		{
 			"[]*bar union mixed zero 2",
 			[]*bar(nil),
 			[]*bar{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*bar{},
 		},
 		{
 			"[]*bar union empty",
 			[]*bar{},
 			[]*bar{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*bar{},
 		},
 		{
 			"[]*bar union mixed empty",
 			[]*bar{{Int: intPtr(1)}},
 			[]*bar{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*bar{{Int: intPtr(1)}},
 		},
 		{
 			"[]*bar union mixed empty 2",
 			[]*bar{},
 			[]*bar{{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*bar{{Int: intPtr(2)}},
 		},
 		{
 			"[]*bar union non empty",
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil},
 			[]*bar{{Int: intPtr(2)}, {Int: intPtr(4)}, {Int: intPtr(5)}, nil},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil, {Int: intPtr(2)}, {Int: intPtr(4)}, {Int: intPtr(5)}},
 		},
 		{
 			"[]*bar custom union zero",
 			[]*bar(nil),
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithSetUnion(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]*bar{}))},
 			[]*bar(nil),
 		},
 		{
 			"[]*bar custom union mixed zero",
 			[]*bar{},
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithSetUnion(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]*bar{}))},
 			[]*bar{},
 		},
 		{
 			"[]*bar custom union mixed zero 2",
 			[]*bar(nil),
 			[]*bar{},
-			[]SliceCoalescerOption{WithSetUnion(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]*bar{}))},
 			[]*bar{},
 		},
 		{
 			"[]*bar custom union empty",
 			[]*bar{},
 			[]*bar{},
-			[]SliceCoalescerOption{WithSetUnion(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]*bar{}))},
 			[]*bar{},
 		},
 		{
 			"[]*bar custom union mixed empty",
 			[]*bar{{Int: intPtr(1)}},
 			[]*bar{},
-			[]SliceCoalescerOption{WithSetUnion(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]*bar{}))},
 			[]*bar{{Int: intPtr(1)}},
 		},
 		{
 			"[]*bar custom union mixed empty 2",
 			[]*bar{},
 			[]*bar{{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithSetUnion(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]*bar{}))},
 			[]*bar{{Int: intPtr(2)}},
 		},
 		{
 			"[]*bar custom union non empty",
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil},
 			[]*bar{{Int: intPtr(2)}, {Int: intPtr(4)}, {Int: intPtr(5)}, nil},
-			[]SliceCoalescerOption{WithSetUnion(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]*bar{}))},
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil, {Int: intPtr(2)}, {Int: intPtr(4)}, {Int: intPtr(5)}},
 		},
 		{
 			"[]*bar field zero",
 			[]*bar(nil),
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(bar{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]*bar{}), "Int")},
 			[]*bar(nil),
 		},
 		{
 			"[]*bar field mixed zero",
 			[]*bar{},
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(bar{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]*bar{}), "Int")},
 			[]*bar{},
 		},
 		{
 			"[]*bar field mixed zero 2",
 			[]*bar(nil),
 			[]*bar{},
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(bar{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]*bar{}), "Int")},
 			[]*bar{},
 		},
 		{
 			"[]*bar field empty",
 			[]*bar{},
 			[]*bar{},
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(bar{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]*bar{}), "Int")},
 			[]*bar{},
 		},
 		{
 			"[]*bar field mixed empty",
 			[]*bar{{Int: intPtr(1)}},
 			[]*bar{},
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(bar{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]*bar{}), "Int")},
 			[]*bar{{Int: intPtr(1)}},
 		},
 		{
 			"[]*bar field mixed empty 2",
 			[]*bar{},
 			[]*bar{{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(bar{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]*bar{}), "Int")},
 			[]*bar{{Int: intPtr(2)}},
 		},
 		{
 			"[]*bar field non empty",
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil},
 			[]*bar{{Int: intPtr(2)}, {Int: intPtr(4)}, {Int: nil}, nil},
-			[]SliceCoalescerOption{WithMergeByField(reflect.TypeOf(bar{}), "Int")},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]*bar{}), "Int")},
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil, {Int: intPtr(4)}},
 		},
 		{
 			"[]*bar merge key zero",
 			[]*bar(nil),
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithMergeByKey(reflect.PtrTo(reflect.TypeOf(bar{})), barPtrMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]*bar{}), barPtrMergeFunc)},
 			[]*bar(nil),
 		},
 		{
 			"[]*bar merge key mixed zero",
 			[]*bar{},
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithMergeByKey(reflect.PtrTo(reflect.TypeOf(bar{})), barPtrMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]*bar{}), barPtrMergeFunc)},
 			[]*bar{},
 		},
 		{
 			"[]*bar merge key mixed zero 2",
 			[]*bar(nil),
 			[]*bar{},
-			[]SliceCoalescerOption{WithMergeByKey(reflect.PtrTo(reflect.TypeOf(bar{})), barPtrMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]*bar{}), barPtrMergeFunc)},
 			[]*bar{},
 		},
 		{
 			"[]*bar merge key empty",
 			[]*bar{},
 			[]*bar{},
-			[]SliceCoalescerOption{WithMergeByKey(reflect.PtrTo(reflect.TypeOf(bar{})), barPtrMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]*bar{}), barPtrMergeFunc)},
 			[]*bar{},
 		},
 		{
 			"[]*bar merge key mixed empty",
 			[]*bar{{Int: intPtr(1)}},
 			[]*bar{},
-			[]SliceCoalescerOption{WithMergeByKey(reflect.PtrTo(reflect.TypeOf(bar{})), barPtrMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]*bar{}), barPtrMergeFunc)},
 			[]*bar{{Int: intPtr(1)}},
 		},
 		{
 			"[]*bar merge key mixed empty 2",
 			[]*bar{},
 			[]*bar{{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithMergeByKey(reflect.PtrTo(reflect.TypeOf(bar{})), barPtrMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]*bar{}), barPtrMergeFunc)},
 			[]*bar{{Int: intPtr(2)}},
 		},
 		{
 			"[]*bar merge key non empty",
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil},
 			[]*bar{{Int: intPtr(2)}, {Int: intPtr(4)}, {Int: nil}, nil},
-			[]SliceCoalescerOption{WithMergeByKey(reflect.PtrTo(reflect.TypeOf(bar{})), barPtrMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]*bar{}), barPtrMergeFunc)},
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil, {Int: intPtr(4)}},
 		},
 		{
@@ -1167,259 +1114,259 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			"[]interface{} union zero",
 			[]interface{}(nil),
 			[]interface{}(nil),
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]interface{}(nil),
 		},
 		{
 			"[]interface{} union mixed zero",
 			[]interface{}{},
 			[]interface{}(nil),
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]interface{}{},
 		},
 		{
 			"[]interface{} union mixed zero 2",
 			[]interface{}(nil),
 			[]interface{}{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]interface{}{},
 		},
 		{
 			"[]interface{} union empty",
 			[]interface{}{},
 			[]interface{}{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]interface{}{},
 		},
 		{
 			"[]interface{} union mixed empty",
 			[]interface{}{&bar{Int: intPtr(1)}},
 			[]interface{}{},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]interface{}{&bar{Int: intPtr(1)}},
 		},
 		{
 			"[]interface{} union mixed empty 2",
 			[]interface{}{},
 			[]interface{}{&bar{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]interface{}{&bar{Int: intPtr(2)}},
 		},
 		{
 			"[]interface{} union non empty",
 			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil},
 			[]interface{}{&bar{Int: intPtr(2)}, &bar{Int: intPtr(4)}, &bar{Int: intPtr(5)}, nil},
-			[]SliceCoalescerOption{WithDefaultSetUnion()},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil, &bar{Int: intPtr(2)}, &bar{Int: intPtr(4)}, &bar{Int: intPtr(5)}},
 		},
 		{
 			"[]interface{} custom union zero",
 			[]interface{}(nil),
 			[]interface{}(nil),
-			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]interface{}{}))},
 			[]interface{}(nil),
 		},
 		{
 			"[]interface{} custom union mixed zero",
 			[]interface{}{},
 			[]interface{}(nil),
-			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]interface{}{}))},
 			[]interface{}{},
 		},
 		{
 			"[]interface{} custom union mixed zero 2",
 			[]interface{}(nil),
 			[]interface{}{},
-			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]interface{}{}))},
 			[]interface{}{},
 		},
 		{
 			"[]interface{} custom union empty",
 			[]interface{}{},
 			[]interface{}{},
-			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]interface{}{}))},
 			[]interface{}{},
 		},
 		{
 			"[]interface{} custom union mixed empty",
 			[]interface{}{&bar{Int: intPtr(1)}},
 			[]interface{}{},
-			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]interface{}{}))},
 			[]interface{}{&bar{Int: intPtr(1)}},
 		},
 		{
 			"[]interface{} custom union mixed empty 2",
 			[]interface{}{},
 			[]interface{}{&bar{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]interface{}{}))},
 			[]interface{}{&bar{Int: intPtr(2)}},
 		},
 		{
 			"[]interface{} custom union non empty",
 			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil},
 			[]interface{}{&bar{Int: intPtr(2)}, &bar{Int: intPtr(4)}, &bar{Int: intPtr(5)}, nil},
-			[]SliceCoalescerOption{WithSetUnion(typeOfInterface)},
+			[]CoalescerOption{WithSetUnion(reflect.TypeOf([]interface{}{}))},
 			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil, &bar{Int: intPtr(2)}, &bar{Int: intPtr(4)}, &bar{Int: intPtr(5)}},
 		},
 		{
 			"[]interface{} merge key zero",
 			[]interface{}(nil),
 			[]interface{}(nil),
-			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]interface{}{}), barPtrInterfaceMergeFunc)},
 			[]interface{}(nil),
 		},
 		{
 			"[]interface{} merge key mixed zero",
 			[]interface{}{},
 			[]interface{}(nil),
-			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]interface{}{}), barPtrInterfaceMergeFunc)},
 			[]interface{}{},
 		},
 		{
 			"[]interface{} merge key mixed zero 2",
 			[]interface{}(nil),
 			[]interface{}{},
-			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]interface{}{}), barPtrInterfaceMergeFunc)},
 			[]interface{}{},
 		},
 		{
 			"[]interface{} merge key empty",
 			[]interface{}{},
 			[]interface{}{},
-			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]interface{}{}), barPtrInterfaceMergeFunc)},
 			[]interface{}{},
 		},
 		{
 			"[]interface{} merge key mixed empty",
 			[]interface{}{&bar{Int: intPtr(1)}},
 			[]interface{}{},
-			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]interface{}{}), barPtrInterfaceMergeFunc)},
 			[]interface{}{&bar{Int: intPtr(1)}},
 		},
 		{
 			"[]interface{} merge key mixed empty 2",
 			[]interface{}{},
 			[]interface{}{&bar{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]interface{}{}), barPtrInterfaceMergeFunc)},
 			[]interface{}{&bar{Int: intPtr(2)}},
 		},
 		{
 			"[]interface{} merge key non empty",
 			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil},
 			[]interface{}{&bar{Int: intPtr(2)}, &bar{Int: intPtr(4)}, &bar{Int: nil}, nil},
-			[]SliceCoalescerOption{WithMergeByKey(typeOfInterface, barPtrInterfaceMergeFunc)},
+			[]CoalescerOption{WithMergeByKey(reflect.TypeOf([]interface{}{}), barPtrInterfaceMergeFunc)},
 			[]interface{}{&bar{Int: intPtr(1)}, &bar{Int: intPtr(2)}, nil, &bar{Int: intPtr(4)}},
 		},
 		{
 			"[]bar default merge by index zero",
 			[]bar(nil),
 			[]bar(nil),
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]bar(nil),
 		},
 		{
 			"[]bar default merge by index mixed zero",
 			[]bar{},
 			[]bar(nil),
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]bar{},
 		},
 		{
 			"[]bar default merge by index mixed zero 2",
 			[]bar(nil),
 			[]bar{},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]bar{},
 		},
 		{
 			"[]bar default merge by index empty",
 			[]bar{},
 			[]bar{},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]bar{},
 		},
 		{
 			"[]bar default merge by index mixed empty",
 			[]bar{{Int: intPtr(1)}},
 			[]bar{},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]bar{{Int: intPtr(1)}},
 		},
 		{
 			"[]bar default merge by index mixed empty 2",
 			[]bar{},
 			[]bar{{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]bar{{Int: intPtr(2)}},
 		},
 		{
 			"[]bar default merge by index non empty 1",
 			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
 			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}, {Int: intPtr(3)}},
 		},
 		{
 			"[]bar default merge by index non empty 2",
 			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}},
 			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
-			[]SliceCoalescerOption{WithDefaultMergeByIndex()},
+			[]CoalescerOption{WithDefaultMergeByIndex()},
 			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
 		},
 		{
 			"[]bar merge by index zero",
 			[]bar(nil),
 			[]bar(nil),
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]bar{}))},
 			[]bar(nil),
 		},
 		{
 			"[]bar merge by index mixed zero",
 			[]bar{},
 			[]bar(nil),
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]bar{}))},
 			[]bar{},
 		},
 		{
 			"[]bar merge by index mixed zero 2",
 			[]bar(nil),
 			[]bar{},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]bar{}))},
 			[]bar{},
 		},
 		{
 			"[]bar merge by index empty",
 			[]bar{},
 			[]bar{},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]bar{}))},
 			[]bar{},
 		},
 		{
 			"[]bar merge by index mixed empty",
 			[]bar{{Int: intPtr(1)}},
 			[]bar{},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]bar{}))},
 			[]bar{{Int: intPtr(1)}},
 		},
 		{
 			"[]bar merge by index mixed empty 2",
 			[]bar{},
 			[]bar{{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]bar{}))},
 			[]bar{{Int: intPtr(2)}},
 		},
 		{
 			"[]bar merge by index non empty 1",
 			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
 			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]bar{}))},
 			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}, {Int: intPtr(3)}},
 		},
 		{
 			"[]bar merge by index non empty 2",
 			[]bar{{Int: intPtr(4)}, {Int: intPtr(5)}},
 			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
-			[]SliceCoalescerOption{WithMergeByIndex(reflect.TypeOf(bar{}))},
+			[]CoalescerOption{WithMergeByIndex(reflect.TypeOf([]bar{}))},
 			[]bar{{Int: intPtr(1)}, {Int: intPtr(2)}, {Int: intPtr(3)}},
 		},
 
@@ -1427,188 +1374,172 @@ func Test_sliceCoalescer_Coalesce(t *testing.T) {
 			"[]*bar append zero",
 			[]*bar(nil),
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*bar(nil),
 		},
 		{
 			"[]*bar append mixed zero",
 			[]*bar{},
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*bar{},
 		},
 		{
 			"[]*bar append mixed zero 2",
 			[]*bar(nil),
 			[]*bar{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*bar{},
 		},
 		{
 			"[]*bar append empty",
 			[]*bar{},
 			[]*bar{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*bar{},
 		},
 		{
 			"[]*bar append mixed empty",
 			[]*bar{{Int: intPtr(1)}},
 			[]*bar{},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*bar{{Int: intPtr(1)}},
 		},
 		{
 			"[]*bar append mixed empty 2",
 			[]*bar{},
 			[]*bar{{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*bar{{Int: intPtr(2)}},
 		},
 		{
 			"[]*bar append non empty",
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil},
 			[]*bar{{Int: intPtr(2)}, {Int: intPtr(4)}, {Int: nil}, nil},
-			[]SliceCoalescerOption{WithDefaultListAppend()},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil, {Int: intPtr(2)}, {Int: intPtr(4)}, {Int: nil}, nil},
 		},
 		{
 			"[]*bar custom append zero",
 			[]*bar(nil),
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithListAppend(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]*bar{}))},
 			[]*bar(nil),
 		},
 		{
 			"[]*bar custom append mixed zero",
 			[]*bar{},
 			[]*bar(nil),
-			[]SliceCoalescerOption{WithListAppend(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]*bar{}))},
 			[]*bar{},
 		},
 		{
 			"[]*bar custom append mixed zero 2",
 			[]*bar(nil),
 			[]*bar{},
-			[]SliceCoalescerOption{WithListAppend(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]*bar{}))},
 			[]*bar{},
 		},
 		{
 			"[]*bar custom append empty",
 			[]*bar{},
 			[]*bar{},
-			[]SliceCoalescerOption{WithListAppend(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]*bar{}))},
 			[]*bar{},
 		},
 		{
 			"[]*bar custom append mixed empty",
 			[]*bar{{Int: intPtr(1)}},
 			[]*bar{},
-			[]SliceCoalescerOption{WithListAppend(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]*bar{}))},
 			[]*bar{{Int: intPtr(1)}},
 		},
 		{
 			"[]*bar custom append mixed empty 2",
 			[]*bar{},
 			[]*bar{{Int: intPtr(2)}},
-			[]SliceCoalescerOption{WithListAppend(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]*bar{}))},
 			[]*bar{{Int: intPtr(2)}},
 		},
 		{
 			"[]*bar custom append non empty",
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil},
 			[]*bar{{Int: intPtr(2)}, {Int: intPtr(4)}, {Int: nil}, nil},
-			[]SliceCoalescerOption{WithListAppend(reflect.PtrTo(reflect.TypeOf(bar{})))},
+			[]CoalescerOption{WithListAppend(reflect.TypeOf([]*bar{}))},
 			[]*bar{{Int: intPtr(1)}, {Int: intPtr(2)}, nil, {Int: intPtr(2)}, {Int: intPtr(4)}, {Int: nil}, nil},
 		},
 		{
 			"[]int nil + nil w/ zero empty option",
 			[]int(nil),
 			[]int(nil),
-			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]CoalescerOption{WithZeroEmptySlice()},
 			[]int(nil),
 		},
 		{
 			"[]int nil + empty w/ zero empty option",
 			[]int(nil),
 			[]int{},
-			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]CoalescerOption{WithZeroEmptySlice()},
 			[]int{},
 		},
 		{
 			"[]int empty + nil w/ zero empty option",
 			[]int{},
 			[]int(nil),
-			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]CoalescerOption{WithZeroEmptySlice()},
 			[]int{},
 		},
 		{
 			"[]int empty + empty w/ zero empty option",
 			[]int{},
 			[]int{},
-			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]CoalescerOption{WithZeroEmptySlice()},
 			[]int{},
 		},
 		{
 			"[]int empty + non-empty w/ zero empty option",
 			[]int{},
 			[]int{1, 2, 3},
-			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]CoalescerOption{WithZeroEmptySlice()},
 			[]int{1, 2, 3},
 		},
 		{
 			"[]int non-empty + empty w/ zero empty option",
 			[]int{1, 2, 3},
 			[]int{},
-			[]SliceCoalescerOption{WithZeroEmptySlice()},
+			[]CoalescerOption{WithZeroEmptySlice()},
 			[]int{1, 2, 3},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			coalescer := NewSliceCoalescer(tt.opt...)
-			coalescer.WithFallback(NewMainCoalescer())
-			got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+			coalescer := NewCoalescer(tt.opt...)
+			got, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())
 		})
 	}
-	t.Run("type errors", func(t *testing.T) {
-		_, err := (&sliceCoalescer{}).Coalesce(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
-		assert.EqualError(t, err, "types do not match: []int != []string")
-		_, err = (&sliceCoalescer{}).Coalesce(reflect.ValueOf(1), reflect.ValueOf(2))
-		assert.EqualError(t, err, "values have wrong kind: expected slice, got int")
-		_, err = (&sliceMergeCoalescer{}).Coalesce(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
-		assert.EqualError(t, err, "types do not match: []int != []string")
-		_, err = (&sliceMergeCoalescer{}).Coalesce(reflect.ValueOf(1), reflect.ValueOf(2))
-		assert.EqualError(t, err, "values have wrong kind: expected slice, got int")
-		_, err = (&sliceAppendCoalescer{}).Coalesce(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
-		assert.EqualError(t, err, "types do not match: []int != []string")
-		_, err = (&sliceAppendCoalescer{}).Coalesce(reflect.ValueOf(1), reflect.ValueOf(2))
-		assert.EqualError(t, err, "values have wrong kind: expected slice, got int")
-	})
 	t.Run("fallback error", func(t *testing.T) {
-		m := newMockCoalescer(t)
-		m.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.Value{}, errors.New("fake"))
-		coalescer := NewSliceCoalescer(WithDefaultSetUnion())
-		coalescer.WithFallback(m)
-		_, err := coalescer.Coalesce(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{2}))
+		coalescer := NewCoalescer(WithDefaultSetUnion(), WithTypeCoalescer(reflect.TypeOf(map[interface{}]int{}), func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return reflect.Value{}, errors.New("fake")
+		}))
+		_, err := coalescer(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{2}))
 		assert.EqualError(t, err, "fake")
 	})
-	t.Run("merge key func error", func(t *testing.T) {
-		coalescer := NewSliceCoalescer(WithMergeByKey(reflect.TypeOf(0), func(int, reflect.Value) reflect.Value {
+	t.Run("merge key func errors", func(t *testing.T) {
+		coalescer := NewCoalescer(WithMergeByKey(reflect.TypeOf([]int{}), func(int, reflect.Value) reflect.Value {
 			return reflect.Value{}
 		}))
-		_, err := coalescer.Coalesce(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{}))
+		_, err := coalescer(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{}))
 		assert.EqualError(t, err, "slice merge key func returned nil")
-		_, err = coalescer.Coalesce(reflect.ValueOf([]int{}), reflect.ValueOf([]int{1}))
+		_, err = coalescer(reflect.ValueOf([]int{}), reflect.ValueOf([]int{1}))
 		assert.EqualError(t, err, "slice merge key func returned nil")
-		coalescer = NewSliceCoalescer(WithMergeByKey(reflect.TypeOf(0), func(int, reflect.Value) reflect.Value {
+		coalescer = NewCoalescer(WithMergeByKey(reflect.TypeOf([]int{}), func(int, reflect.Value) reflect.Value {
 			return reflect.ValueOf([]int{1, 2, 3})
 		}))
-		_, err = coalescer.Coalesce(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{}))
+		_, err = coalescer(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{}))
 		assert.EqualError(t, err, "slice merge key [1 2 3] of type []int is not comparable")
-		_, err = coalescer.Coalesce(reflect.ValueOf([]int{}), reflect.ValueOf([]int{1}))
+		_, err = coalescer(reflect.ValueOf([]int{}), reflect.ValueOf([]int{1}))
 		assert.EqualError(t, err, "slice merge key [1 2 3] of type []int is not comparable")
 	})
 }

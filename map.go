@@ -16,43 +16,14 @@ package goalesce
 
 import "reflect"
 
-// MapCoalescerOption is an option to be passed to NewMapCoalescer. There is currently no available built-in option, but
-// this could change in the future.
-type MapCoalescerOption func(c *mapCoalescer)
-
-// NewMapCoalescer creates a new Coalescer for maps.
-func NewMapCoalescer(opts ...MapCoalescerOption) Coalescer {
-	c := &mapCoalescer{
-		fallback: &atomicCoalescer{},
-	}
-	for _, opt := range opts {
-		opt(c)
-	}
-	return c
-}
-
-type mapCoalescer struct {
-	fallback Coalescer
-}
-
-func (c *mapCoalescer) WithFallback(fallback Coalescer) {
-	c.fallback = fallback
-}
-
-func (c *mapCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
-	if err := checkTypesMatchWithKind(v1, v2, reflect.Map); err != nil {
-		return reflect.Value{}, err
-	}
-	if value, done := checkZero(v1, v2); done {
-		return value, nil
-	}
+func (c *mainCoalescer) coalesceMap(v1, v2 reflect.Value) (reflect.Value, error) {
 	coalesced := reflect.MakeMap(v1.Type())
 	for _, k := range v1.MapKeys() {
 		coalesced.SetMapIndex(k, v1.MapIndex(k))
 	}
 	for _, k := range v2.MapKeys() {
 		if v1.MapIndex(k).IsValid() {
-			coalescedValue, err := c.fallback.Coalesce(v1.MapIndex(k), v2.MapIndex(k))
+			coalescedValue, err := c.coalesce(v1.MapIndex(k), v2.MapIndex(k))
 			if err != nil {
 				return reflect.Value{}, err
 			}

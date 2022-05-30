@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestCoalesce(t *testing.T) {
@@ -34,7 +33,7 @@ func TestCoalesce(t *testing.T) {
 		name string
 		v1   interface{}
 		v2   interface{}
-		opts []MainCoalescerOption
+		opts []CoalescerOption
 		want interface{}
 	}{
 		{
@@ -108,18 +107,6 @@ func TestCoalesce(t *testing.T) {
 			intPtr(1),
 		},
 		{
-			"*int custom coalescer",
-			intPtr(1),
-			intPtr(2),
-			[]MainCoalescerOption{WithPointerCoalescer(func() Coalescer {
-				c := &mockCoalescer{}
-				c.On("WithFallback", mock.Anything).Return()
-				c.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.ValueOf(intPtr(3)), (error)(nil))
-				return c
-			}())},
-			intPtr(3),
-		},
-		{
 			"string",
 			"a",
 			"b",
@@ -179,7 +166,7 @@ func TestCoalesce(t *testing.T) {
 			"struct non zero custom coalescer",
 			bar{Int: 0, Foo: foo{Int: 1}},
 			bar{Int: 1},
-			[]MainCoalescerOption{WithStructCoalescer(NewAtomicCoalescer())},
+			[]CoalescerOption{WithAtomicType(reflect.TypeOf(bar{}))},
 			bar{Int: 1},
 		},
 		{
@@ -200,7 +187,7 @@ func TestCoalesce(t *testing.T) {
 			"map[int]foo custom coalescer",
 			map[int]foo{1: {Int: 1}, 3: {Int: 3}},
 			map[int]foo{1: {Int: 2}, 2: {Int: 2}},
-			[]MainCoalescerOption{WithMapCoalescer(NewAtomicCoalescer())},
+			[]CoalescerOption{WithAtomicType(reflect.TypeOf(map[int]foo{}))},
 			map[int]foo{1: {Int: 2}, 2: {Int: 2}},
 		},
 		{
@@ -228,64 +215,62 @@ func TestCoalesce(t *testing.T) {
 			"[]int union",
 			[]int{1, 3},
 			[]int{1, 2},
-			[]MainCoalescerOption{WithSliceCoalescer(NewSliceCoalescer(WithDefaultSetUnion()))},
+			[]CoalescerOption{WithDefaultSetUnion()},
 			[]int{1, 3, 2},
 		},
 		{
 			"[]int append",
 			[]int{1, 3},
 			[]int{1, 2},
-			[]MainCoalescerOption{WithSliceCoalescer(NewSliceCoalescer(WithDefaultListAppend()))},
+			[]CoalescerOption{WithDefaultListAppend()},
 			[]int{1, 3, 1, 2},
 		},
 		{
 			"[]foo custom",
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]foo{{Int: 3}, {Int: 4}, {Int: 5}},
-			[]MainCoalescerOption{WithSliceCoalescer(NewSliceCoalescer(WithMergeByField(reflect.TypeOf(foo{}), "Int")))},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "Int")},
 			[]foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 4}, {Int: 5}},
 		},
 		{
 			"[]*int custom",
 			[]*foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]*foo{{Int: 3}, {Int: 4}, {Int: 5}},
-			[]MainCoalescerOption{
-				WithSliceCoalescer(
-					NewSliceCoalescer(
-						WithMergeByKey(
-							reflect.PtrTo(reflect.TypeOf(foo{})),
-							func(_ int, v reflect.Value) reflect.Value {
-								i := v.Interface()
-								return reflect.ValueOf(i.(*foo).Int)
-							},
-						)))},
+			[]CoalescerOption{
+				WithMergeByKey(
+					reflect.TypeOf([]*foo{}),
+					func(_ int, v reflect.Value) reflect.Value {
+						i := v.Interface()
+						return reflect.ValueOf(i.(*foo).Int)
+					},
+				)},
 			[]*foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 4}, {Int: 5}},
 		},
 		{
 			"[]*int type coalescer",
 			[]*foo{{Int: 1}, {Int: 2}, {Int: 3}},
 			[]*foo{{Int: 3}, {Int: 4}, {Int: 5}},
-			[]MainCoalescerOption{
-				WithSliceCoalescer(NewSliceCoalescer(WithMergeByField(reflect.TypeOf(foo{}), "Int"))),
-				WithTypeCoalescer(reflect.TypeOf([]*foo{}), &atomicCoalescer{})}, // will prevail
+			[]CoalescerOption{
+				WithMergeByField(reflect.TypeOf([]*foo{}), "Int"),
+				WithTypeCoalescer(reflect.TypeOf([]*foo{}), coalesceAtomic)}, // will prevail
 			[]*foo{{Int: 3}, {Int: 4}, {Int: 5}},
 		},
-		{"trilean nil nil", (*bool)(nil), (*bool)(nil), []MainCoalescerOption{WithTrileans()}, (*bool)(nil)},
-		{"trilean nil false", (*bool)(nil), boolPtr(false), []MainCoalescerOption{WithTrileans()}, boolPtr(false)},
-		{"trilean nil true", (*bool)(nil), boolPtr(true), []MainCoalescerOption{WithTrileans()}, boolPtr(true)},
-		{"trilean false nil", boolPtr(false), (*bool)(nil), []MainCoalescerOption{WithTrileans()}, boolPtr(false)},
-		{"trilean false false", boolPtr(false), boolPtr(false), []MainCoalescerOption{WithTrileans()}, boolPtr(false)},
-		{"trilean false true", boolPtr(false), boolPtr(true), []MainCoalescerOption{WithTrileans()}, boolPtr(true)},
-		{"trilean true nil", boolPtr(true), (*bool)(nil), []MainCoalescerOption{WithTrileans()}, boolPtr(true)},
-		// with trileans: Coalesce(true, false) = false
-		{"trilean true false", boolPtr(true), boolPtr(false), []MainCoalescerOption{WithTrileans()}, boolPtr(false)},
-		// without trileans: Coalesce(true, false) = true
+		{"trilean nil nil", (*bool)(nil), (*bool)(nil), []CoalescerOption{WithTrileans()}, (*bool)(nil)},
+		{"trilean nil false", (*bool)(nil), boolPtr(false), []CoalescerOption{WithTrileans()}, boolPtr(false)},
+		{"trilean nil true", (*bool)(nil), boolPtr(true), []CoalescerOption{WithTrileans()}, boolPtr(true)},
+		{"trilean false nil", boolPtr(false), (*bool)(nil), []CoalescerOption{WithTrileans()}, boolPtr(false)},
+		{"trilean false false", boolPtr(false), boolPtr(false), []CoalescerOption{WithTrileans()}, boolPtr(false)},
+		{"trilean false true", boolPtr(false), boolPtr(true), []CoalescerOption{WithTrileans()}, boolPtr(true)},
+		{"trilean true nil", boolPtr(true), (*bool)(nil), []CoalescerOption{WithTrileans()}, boolPtr(true)},
+		// with trileans: coalesce(true, false) = false
+		{"trilean true false", boolPtr(true), boolPtr(false), []CoalescerOption{WithTrileans()}, boolPtr(false)},
+		// without trileans: coalesce(true, false) = true
 		{"trilean true false", boolPtr(true), boolPtr(false), nil, boolPtr(true)},
-		{"trilean true true", boolPtr(true), boolPtr(true), []MainCoalescerOption{WithTrileans()}, boolPtr(true)},
-		{"type coalescer zero values", "", "", []MainCoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer{})}, "ZERO!ZERO!"},
-		{"type coalescer zero value 1", "abc", "", []MainCoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer{})}, "abcZERO!"},
-		{"type coalescer zero value 2", "", "def", []MainCoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer{})}, "ZERO!def"},
-		{"type coalescer non-zero values", "abc", "def", []MainCoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer{})}, "abcdef"},
+		{"trilean true true", boolPtr(true), boolPtr(true), []CoalescerOption{WithTrileans()}, boolPtr(true)},
+		{"type coalescer zero values", "", "", []CoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer)}, "ZERO!ZERO!"},
+		{"type coalescer zero value 1", "abc", "", []CoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer)}, "abcZERO!"},
+		{"type coalescer zero value 2", "", "def", []CoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer)}, "ZERO!def"},
+		{"type coalescer non-zero values", "abc", "def", []CoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer)}, "abcdef"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -307,9 +292,7 @@ func TestMustCoalesce(t *testing.T) {
 	})
 }
 
-type weirdStringCoalescer struct{}
-
-func (w weirdStringCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, error) {
+func weirdStringCoalescer(v1, v2 reflect.Value) (reflect.Value, error) {
 	if v1.IsZero() {
 		v1 = reflect.ValueOf("ZERO!")
 	}
@@ -318,5 +301,3 @@ func (w weirdStringCoalescer) Coalesce(v1, v2 reflect.Value) (reflect.Value, err
 	}
 	return reflect.ValueOf(v1.Interface().(string) + v2.Interface().(string)), nil
 }
-
-func (w weirdStringCoalescer) WithFallback(_ Coalescer) {}

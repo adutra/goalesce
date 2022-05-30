@@ -16,11 +16,18 @@ package goalesce_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/adutra/goalesce"
 	"reflect"
 	"strings"
 )
+
+type User struct {
+	ID   int
+	Name string
+	Age  int
+}
 
 func Example() {
 	var v1, v2, coalesced interface{}
@@ -37,11 +44,6 @@ func Example() {
 	fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
 
 	// Coalescing structs
-	type User struct {
-		ID   int
-		Name string
-		Age  int
-	}
 	v1 = User{ID: 1, Name: "Alice"}
 	v2 = User{ID: 1, Age: 20}
 	coalesced, _ = goalesce.Coalesce(v1, v2)
@@ -73,36 +75,31 @@ func Example() {
 	// Coalescing slices with empty slices treated as zero-value slices
 	v1 = []int{1, 2}
 	v2 = []int{} // empty slice will be considered zero-value
-	sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithZeroEmptySlice())
-	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithZeroEmptySlice())
 	fmt.Printf("Coalesce(%+v, %+v, ZeroEmptySlice) = %+v\n", v1, v2, coalesced)
 
 	// Coalescing slices with set-union semantics
 	v1 = []int{1, 2}
 	v2 = []int{2, 3}
-	sliceCoalescer = goalesce.NewSliceCoalescer(goalesce.WithDefaultSetUnion())
-	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithDefaultSetUnion())
 	fmt.Printf("Coalesce(%+v, %+v, SetUnion) = %+v\n", v1, v2, coalesced)
 
 	// Coalescing slices with list-append semantics
 	v1 = []int{1, 2}
 	v2 = []int{2, 3}
-	sliceCoalescer = goalesce.NewSliceCoalescer(goalesce.WithDefaultListAppend())
-	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithDefaultListAppend())
 	fmt.Printf("Coalesce(%+v, %+v, ListAppend) = %+v\n", v1, v2, coalesced)
 
 	// Coalescing slices with merge-by-index semantics
 	v1 = []int{1, 2, 3}
 	v2 = []int{-1, -2}
-	sliceCoalescer = goalesce.NewSliceCoalescer(goalesce.WithDefaultMergeByIndex())
-	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithDefaultMergeByIndex())
 	fmt.Printf("Coalesce(%+v, %+v, MergeByIndex) = %+v\n", v1, v2, coalesced)
 
 	// Coalescing slices with merge-by-key semantics, merge key = field User.ID
 	v1 = []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 	v2 = []User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
-	sliceCoalescer = goalesce.NewSliceCoalescer(goalesce.WithMergeByField(reflect.TypeOf(User{}), "ID"))
-	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithMergeByField(reflect.TypeOf([]User{}), "ID"))
 	fmt.Printf("Coalesce(%+v, %+v, MergeByField) = %+v\n", v1, v2, coalesced)
 
 	// Coalescing structs with custom field strategies
@@ -192,11 +189,10 @@ func Example() {
 }
 
 func ExampleWithDefaultSetUnion() {
-	sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultSetUnion())
 	{
 		v1 := []int{1, 2}
 		v2 := []int{2, 3}
-		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithDefaultSetUnion())
 		fmt.Printf("Coalesce(%+v, %+v, SetUnion) = %+v\n", v1, v2, coalesced)
 	}
 	{
@@ -204,7 +200,7 @@ func ExampleWithDefaultSetUnion() {
 		intPtr := func(i int) *int { return &i }
 		v1 := []*int{new(int), intPtr(0)} // new(int) and intPtr(0) are equal and point both to 0
 		v2 := []*int{nil, intPtr(1)}      // nil will be coalesced as the zero-value (0)
-		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithDefaultSetUnion())
 		fmt.Printf("Coalesce(%+v, %+v, SetUnion) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
 	}
 	// output:
@@ -213,11 +209,10 @@ func ExampleWithDefaultSetUnion() {
 }
 
 func ExampleWithDefaultListAppend() {
-	sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultListAppend())
 	{
 		v1 := []int{1, 2}
 		v2 := []int{2, 3}
-		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithDefaultListAppend())
 		fmt.Printf("Coalesce(%+v, %+v, ListAppend) = %+v\n", v1, v2, coalesced)
 	}
 	{
@@ -225,7 +220,7 @@ func ExampleWithDefaultListAppend() {
 		intPtr := func(i int) *int { return &i }
 		v1 := []*int{new(int), intPtr(0)}
 		v2 := []*int{(*int)(nil), intPtr(1)}
-		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithDefaultListAppend())
 		fmt.Printf("Coalesce(%+v, %+v, ListAppend) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
 	}
 	// output:
@@ -234,11 +229,10 @@ func ExampleWithDefaultListAppend() {
 }
 
 func ExampleWithDefaultMergeByIndex() {
-	sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultMergeByIndex())
 	{
 		v1 := []int{1, 2, 3}
 		v2 := []int{-1, -2}
-		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithDefaultMergeByIndex())
 		fmt.Printf("Coalesce(%+v, %+v, MergeByIndex) = %+v\n", v1, v2, coalesced)
 	}
 	{
@@ -246,7 +240,7 @@ func ExampleWithDefaultMergeByIndex() {
 		intPtr := func(i int) *int { return &i }
 		v1 := []*int{intPtr(1), intPtr(2), intPtr(3)}
 		v2 := []*int{nil, intPtr(-2)}
-		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithDefaultMergeByIndex())
 		fmt.Printf("Coalesce(%+v, %+v, MergeByIndex) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
 	}
 	// output:
@@ -255,23 +249,17 @@ func ExampleWithDefaultMergeByIndex() {
 }
 
 func ExampleWithMergeByField() {
-	type User struct {
-		ID   int
-		Name string
-		Age  int
-	}
-	sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithMergeByField(reflect.TypeOf(User{}), "ID"))
 	{
 		v1 := []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 		v2 := []User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
-		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByField(reflect.TypeOf([]User{}), "ID"))
 		fmt.Printf("Coalesce(%+v, %+v, MergeByField) = %+v\n", v1, v2, coalesced)
 	}
 	{
 		// slice of pointers
 		v1 := []*User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 		v2 := []*User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
-		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByField(reflect.TypeOf([]*User{}), "ID"))
 		fmt.Printf("Coalesce(%+v, %+v, MergeByField) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
 	}
 	// output:
@@ -280,20 +268,13 @@ func ExampleWithMergeByField() {
 }
 
 func ExampleSliceMergeKeyFunc() {
-	type User struct {
-		ID   int
-		Name string
-		Age  int
-	}
-	typeOfUser := reflect.TypeOf(User{})
 	{
 		v1 := []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 		v2 := []User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
 		mergeKeyFunc := func(_ int, v reflect.Value) reflect.Value {
 			return v.FieldByName("ID")
 		}
-		sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithMergeByKey(typeOfUser, mergeKeyFunc))
-		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByKey(reflect.TypeOf([]User{}), mergeKeyFunc))
 		fmt.Printf("Coalesce(%+v, %+v, MergeByKey) = %+v\n", v1, v2, coalesced)
 	}
 	{
@@ -302,13 +283,66 @@ func ExampleSliceMergeKeyFunc() {
 		mergeKeyFunc := func(_ int, v reflect.Value) reflect.Value {
 			return v.Elem().FieldByName("ID")
 		}
-		sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithMergeByKey(reflect.PtrTo(typeOfUser), mergeKeyFunc))
-		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByKey(reflect.TypeOf([]*User{}), mergeKeyFunc))
 		fmt.Printf("Coalesce(%+v, %+v, MergeByKey) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
 	}
 	// output:
 	// Coalesce([{ID:1 Name:Alice Age:0} {ID:2 Name:Bob Age:0}], [{ID:2 Name: Age:30} {ID:1 Name: Age:20}], MergeByKey) = [{ID:1 Name:Alice Age:20} {ID:2 Name:Bob Age:30}]
 	// Coalesce([&{ID:1 Name:Alice Age:0} &{ID:2 Name:Bob Age:0}], [&{ID:2 Name: Age:30} &{ID:1 Name: Age:20}], MergeByKey) = [&{ID:1 Name:Alice Age:20} &{ID:2 Name:Bob Age:30}]
+}
+
+func ExampleWithTypeCoalescer() {
+	userCoalescer := func(v1, v2 reflect.Value) (reflect.Value, error) {
+		if v1.FieldByName("ID").Int() == 1 {
+			return reflect.Value{}, errors.New("user 1 has been deleted")
+		}
+		return reflect.Value{}, nil // delegate to parent coalescer
+	}
+	{
+		v1 := User{ID: 1, Name: "Alice"}
+		v2 := User{ID: 1, Age: 20}
+		mainCoalescer := goalesce.NewCoalescer(goalesce.WithTypeCoalescer(reflect.TypeOf(User{}), userCoalescer))
+		coalesced, err := mainCoalescer(reflect.ValueOf(v1), reflect.ValueOf(v2))
+		fmt.Printf("Coalesce(%+v, %+v, WithTypeCoalescer) = %+v, %v\n", v1, v2, coalesced, err)
+	}
+	{
+		v1 := User{ID: 2, Name: "Bob"}
+		v2 := User{ID: 2, Age: 30}
+		mainCoalescer := goalesce.NewCoalescer(goalesce.WithTypeCoalescer(reflect.TypeOf(User{}), userCoalescer))
+		coalesced, err := mainCoalescer(reflect.ValueOf(v1), reflect.ValueOf(v2))
+		fmt.Printf("Coalesce(%+v, %+v, WithTypeCoalescer) = %+v, %v\n", v1, v2, coalesced, err)
+	}
+	// output:
+	// Coalesce({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithTypeCoalescer) = <invalid reflect.Value>, user 1 has been deleted
+	// Coalesce({ID:2 Name:Bob Age:0}, {ID:2 Name: Age:30}, WithTypeCoalescer) = {ID:2 Name:Bob Age:30}, <nil>
+}
+
+func ExampleWithFieldCoalescerProvider() {
+	userCoalescerProvider := func(parent goalesce.Coalescer) goalesce.Coalescer {
+		return func(v1, v2 reflect.Value) (reflect.Value, error) {
+			if v1.Int() == 1 {
+				return reflect.Value{}, errors.New("user 1 has been deleted")
+			}
+			return parent(v1, v2) // use parent coalescer
+		}
+	}
+	{
+		v1 := User{ID: 1, Name: "Alice"}
+		v2 := User{ID: 1, Age: 20}
+		mainCoalescer := goalesce.NewCoalescer(goalesce.WithFieldCoalescerProvider(reflect.TypeOf(User{}), "ID", userCoalescerProvider))
+		coalesced, err := mainCoalescer(reflect.ValueOf(v1), reflect.ValueOf(v2))
+		fmt.Printf("Coalesce(%+v, %+v, WithFieldCoalescerProvider) = %+v, %v\n", v1, v2, coalesced, err)
+	}
+	{
+		v1 := User{ID: 2, Name: "Bob"}
+		v2 := User{ID: 2, Age: 30}
+		mainCoalescer := goalesce.NewCoalescer(goalesce.WithFieldCoalescerProvider(reflect.TypeOf(User{}), "ID", userCoalescerProvider))
+		coalesced, err := mainCoalescer(reflect.ValueOf(v1), reflect.ValueOf(v2))
+		fmt.Printf("Coalesce(%+v, %+v, WithFieldCoalescerProvider) = %+v, %v\n", v1, v2, coalesced, err)
+	}
+	// output:
+	// Coalesce({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithFieldCoalescerProvider) = <invalid reflect.Value>, user 1 has been deleted
+	// Coalesce({ID:2 Name:Bob Age:0}, {ID:2 Name: Age:30}, WithFieldCoalescerProvider) = {ID:2 Name:Bob Age:30}, <nil>
 }
 
 func printPtrSlice(i interface{}) string {

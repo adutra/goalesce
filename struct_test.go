@@ -20,68 +20,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewStructCoalescer(t *testing.T) {
-	t.Run("no opts", func(t *testing.T) {
-		got := NewStructCoalescer()
-		assert.Equal(t, &structCoalescer{fallback: &atomicCoalescer{}}, got)
-	})
-	t.Run("with generic option", func(t *testing.T) {
-		var passed *structCoalescer
-		opt := func(c *structCoalescer) {
-			passed = c
-		}
-		returned := NewStructCoalescer(opt)
-		assert.Equal(t, &structCoalescer{fallback: &atomicCoalescer{}}, returned)
-		assert.Equal(t, returned, passed)
-	})
-	t.Run("with field coalescer", func(t *testing.T) {
-		type foo struct {
-			Int int
-		}
-		m := newMockCoalescer(t)
-		m.On("WithFallback", mock.Anything).Return()
-		actual := NewStructCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "Int", m))
-		assert.Equal(
-			t,
-			&structCoalescer{
-				fallback: &atomicCoalescer{},
-				fieldCoalescers: map[reflect.Type]map[string]Coalescer{
-					reflect.TypeOf(foo{}): {"Int": m},
-				},
-			},
-			actual)
-		main := NewMainCoalescer()
-		actual.WithFallback(main)
-		m.AssertCalled(t, "WithFallback", main)
-	})
-}
-
-func TestWithFieldCoalescer(t *testing.T) {
-	type User struct {
-		ID string
-	}
-	c := &structCoalescer{}
-	m := &mockCoalescer{}
-	WithFieldCoalescer(reflect.TypeOf(User{}), "ID", m)(c)
-	expected := map[reflect.Type]map[string]Coalescer{reflect.TypeOf(User{}): {"ID": m}}
-	assert.Equal(t, expected, c.fieldCoalescers)
-}
-
-func TestWithAtomicField(t *testing.T) {
-	type User struct {
-		ID string
-	}
-	c := &structCoalescer{}
-	WithAtomicField(reflect.TypeOf(User{}), "ID")(c)
-	expected := map[reflect.Type]map[string]Coalescer{reflect.TypeOf(User{}): {"ID": &atomicCoalescer{}}}
-	assert.Equal(t, expected, c.fieldCoalescers)
-}
-
-func Test_structCoalescer_Coalesce(t *testing.T) {
+func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		type foo struct {
 			Int int
@@ -207,9 +149,8 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				coalescer := NewStructCoalescer()
-				coalescer.WithFallback(NewMainCoalescer())
-				got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+				coalescer := NewCoalescer()
+				got, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got.Interface())
 			})
@@ -327,9 +268,8 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				coalescer := NewStructCoalescer()
-				coalescer.WithFallback(NewMainCoalescer())
-				got, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+				coalescer := NewCoalescer()
+				got, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got.Interface())
 			})
@@ -340,8 +280,8 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 			type foo struct {
 				Ints []int
 			}
-			coalescer := NewStructCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "Ints", &sliceAppendCoalescer{}))
-			got, err := coalescer.Coalesce(reflect.ValueOf(foo{Ints: []int{1, 2}}), reflect.ValueOf(foo{Ints: []int{2, 3}}))
+			coalescer := NewCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "Ints", coalesceSliceAppend))
+			got, err := coalescer(reflect.ValueOf(foo{Ints: []int{1, 2}}), reflect.ValueOf(foo{Ints: []int{2, 3}}))
 			require.NoError(t, err)
 			assert.Equal(t, foo{Ints: []int{1, 2, 2, 3}}, got.Interface())
 		})
@@ -349,8 +289,8 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 			type foo struct {
 				Ints map[int]string
 			}
-			coalescer := NewStructCoalescer(WithAtomicField(reflect.TypeOf(foo{}), "Ints"))
-			got, err := coalescer.Coalesce(
+			coalescer := NewCoalescer(WithAtomicField(reflect.TypeOf(foo{}), "Ints"))
+			got, err := coalescer(
 				reflect.ValueOf(foo{Ints: map[int]string{1: "abc"}}),
 				reflect.ValueOf(foo{Ints: map[int]string{1: "def"}}),
 			)
@@ -468,33 +408,20 @@ func Test_structCoalescer_Coalesce(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				coalescer := NewStructCoalescer()
-				_, err := coalescer.Coalesce(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+				coalescer := NewCoalescer()
+				_, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 				assert.EqualError(t, err, tt.want)
 			})
 		}
-	})
-	t.Run("type errors", func(t *testing.T) {
-		type foo struct {
-			Int int
-		}
-		type bar struct {
-			Int int
-		}
-		_, err := NewStructCoalescer().Coalesce(reflect.ValueOf(foo{}), reflect.ValueOf(bar{}))
-		assert.EqualError(t, err, "types do not match: goalesce.foo != goalesce.bar")
-		_, err = NewStructCoalescer().Coalesce(reflect.ValueOf(1), reflect.ValueOf(2))
-		assert.EqualError(t, err, "values have wrong kind: expected struct, got int")
 	})
 	t.Run("fallback error", func(t *testing.T) {
 		type foo struct {
 			Int int
 		}
-		m := newMockCoalescer(t)
-		m.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.Value{}, errors.New("fake"))
-		coalescer := NewStructCoalescer()
-		coalescer.WithFallback(m)
-		_, err := coalescer.Coalesce(reflect.ValueOf(foo{Int: 1}), reflect.ValueOf(foo{Int: 2}))
+		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return reflect.Value{}, errors.New("fake")
+		}))
+		_, err := coalescer(reflect.ValueOf(foo{Int: 1}), reflect.ValueOf(foo{Int: 2}))
 		assert.EqualError(t, err, "fake")
 	})
 }

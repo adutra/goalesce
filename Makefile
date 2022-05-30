@@ -17,7 +17,7 @@ M = $(shell [ "$$(tput colors 2> /dev/null || echo 0)" -ge 8 ] && printf "\033[3
 export GO111MODULE=on
 
 .PHONY: all
-all: check-license mocks fmt lint test-coverage | $(BIN)
+all: check-license fmt lint test-coverage | $(BIN)
 
 # Tools
 
@@ -43,10 +43,6 @@ $(BIN)/gotestsum: PACKAGE=gotest.tools/gotestsum@latest
 
 ADDLICENSE = $(BIN)/addlicense
 $(BIN)/addlicense: PACKAGE=github.com/google/addlicense@latest
-
-# FIXME this might break since Mockery does not officially support installing with go install
-MOCKERY = $(BIN)/mockery
-$(BIN)/mockery: PACKAGE=github.com/vektra/mockery/v2@latest
 
 # Tests
 
@@ -111,8 +107,3 @@ check-license: | $(ADDLICENSE) ; $(info $(M) checking license headers...)
 
 update-license: | $(ADDLICENSE) ; $(info $(M) updating license headers...)
 	$Q $(ADDLICENSE) -c "Alexandre Dutra" -ignore '.github/**'  -ignore '.idea/**' -ignore 'test/**' -ignore 'bin/**' . 2> /dev/null
-
-# Mocks
-
-mock mocks: | $(MOCKERY) ; $(info $(M) generating mocks...)
-	$Q $(MOCKERY) --quiet --name=Coalescer --structname=mockCoalescer --inpackage --filename=coalescer_test.go

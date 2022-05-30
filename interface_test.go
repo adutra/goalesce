@@ -20,27 +20,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewInterfaceCoalescer(t *testing.T) {
-	t.Run("no opts", func(t *testing.T) {
-		got := NewInterfaceCoalescer()
-		assert.Equal(t, &interfaceCoalescer{fallback: &atomicCoalescer{}}, got)
-	})
-	t.Run("with generic option", func(t *testing.T) {
-		var passed *interfaceCoalescer
-		opt := func(c *interfaceCoalescer) {
-			passed = c
-		}
-		returned := NewInterfaceCoalescer(opt)
-		assert.Equal(t, &interfaceCoalescer{fallback: &atomicCoalescer{}}, returned)
-		assert.Equal(t, returned, passed)
-	})
-}
-
-func Test_interfaceCoalescer_Coalesce(t *testing.T) {
+func Test_mainCoalescer_coalesceInterface(t *testing.T) {
 	type foo struct {
 		Int int
 	}
@@ -137,27 +120,19 @@ func Test_interfaceCoalescer_Coalesce(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			coalescer := NewInterfaceCoalescer()
-			coalescer.WithFallback(NewMainCoalescer())
-			got, err := coalescer.Coalesce(reflect.ValueOf(&tt.v1).Elem(), reflect.ValueOf(&tt.v2).Elem())
+			coalescer := NewCoalescer()
+			got, err := coalescer(reflect.ValueOf(&tt.v1).Elem(), reflect.ValueOf(&tt.v2).Elem())
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())
 		})
 	}
-	t.Run("type errors", func(t *testing.T) {
-		_, err := NewInterfaceCoalescer().Coalesce(reflect.ValueOf(1), reflect.ValueOf("a"))
-		assert.EqualError(t, err, "types do not match: int != string")
-		_, err = NewInterfaceCoalescer().Coalesce(reflect.ValueOf(1), reflect.ValueOf(2))
-		assert.EqualError(t, err, "values have wrong kind: expected interface, got int")
-	})
 	t.Run("fallback error", func(t *testing.T) {
-		m := newMockCoalescer(t)
-		m.On("Coalesce", mock.Anything, mock.Anything).Return(reflect.Value{}, errors.New("fake"))
-		coalescer := NewInterfaceCoalescer()
-		coalescer.WithFallback(m)
+		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return reflect.Value{}, errors.New("fake")
+		}))
 		var v1 interface{} = 1
 		var v2 interface{} = 2
-		_, err := coalescer.Coalesce(reflect.ValueOf(&v1).Elem(), reflect.ValueOf(&v2).Elem())
+		_, err := coalescer(reflect.ValueOf(&v1).Elem(), reflect.ValueOf(&v2).Elem())
 		assert.EqualError(t, err, "fake")
 	})
 }

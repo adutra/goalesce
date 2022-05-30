@@ -41,16 +41,16 @@ import (
 // See SliceCoalescerOption.
 //
 // The function returns an error if the values are not of the same type.
-func Coalesce(o1, o2 interface{}, opts ...MainCoalescerOption) (coalesced interface{}, err error) {
+func Coalesce(o1, o2 interface{}, opts ...CoalescerOption) (coalesced interface{}, err error) {
 	if o1 == nil {
 		return o2, nil
 	} else if o2 == nil {
 		return o1, nil
 	}
-	coalescer := NewMainCoalescer(opts...)
+	coalescer := NewCoalescer(opts...)
 	v1 := reflect.ValueOf(o1)
 	v2 := reflect.ValueOf(o2)
-	result, err := coalescer.Coalesce(v1, v2)
+	result, err := coalescer(v1, v2)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func Coalesce(o1, o2 interface{}, opts ...MainCoalescerOption) (coalesced interf
 }
 
 // MustCoalesce is like Coalesce, but panics if the coalescing returns an error.
-func MustCoalesce(o1, o2 interface{}, opts ...MainCoalescerOption) interface{} {
+func MustCoalesce(o1, o2 interface{}, opts ...CoalescerOption) interface{} {
 	coalesced, err := Coalesce(o1, o2, opts...)
 	if err != nil {
 		panic(err)

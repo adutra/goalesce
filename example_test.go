@@ -96,11 +96,11 @@ func Example() {
 	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithDefaultMergeByIndex())
 	fmt.Printf("Coalesce(%+v, %+v, MergeByIndex) = %+v\n", v1, v2, coalesced)
 
-	// Coalescing slices with merge-by-key semantics, merge key = field User.ID
+	// Coalescing slices with merge-by-id semantics, merge key = field User.ID
 	v1 = []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 	v2 = []User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
 	coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithMergeByID(reflect.TypeOf([]User{}), "ID"))
-	fmt.Printf("Coalesce(%+v, %+v, MergeByField) = %+v\n", v1, v2, coalesced)
+	fmt.Printf("Coalesce(%+v, %+v, MergeByID) = %+v\n", v1, v2, coalesced)
 
 	// Coalescing structs with custom field strategies
 	type Actor struct {
@@ -154,7 +154,7 @@ func Example() {
 	// Coalesce([1 2], [2 3], SetUnion) = [1 2 3]
 	// Coalesce([1 2], [2 3], ListAppend) = [1 2 2 3]
 	// Coalesce([1 2 3], [-1 -2], MergeByIndex) = [-1 -2 3]
-	// Coalesce([{ID:1 Name:Alice Age:0} {ID:2 Name:Bob Age:0}], [{ID:2 Name: Age:30} {ID:1 Name: Age:20}], MergeByField) = [{ID:1 Name:Alice Age:20} {ID:2 Name:Bob Age:30}]
+	// Coalesce([{ID:1 Name:Alice Age:0} {ID:2 Name:Bob Age:0}], [{ID:2 Name: Age:30} {ID:1 Name: Age:20}], MergeByID) = [{ID:1 Name:Alice Age:20} {ID:2 Name:Bob Age:30}]
 	// Coalesced movie:
 	// {
 	//   "Name": "The Matrix",
@@ -253,18 +253,18 @@ func ExampleWithMergeByID() {
 		v1 := []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 		v2 := []User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
 		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByID(reflect.TypeOf([]User{}), "ID"))
-		fmt.Printf("Coalesce(%+v, %+v, MergeByField) = %+v\n", v1, v2, coalesced)
+		fmt.Printf("Coalesce(%+v, %+v, MergeByID) = %+v\n", v1, v2, coalesced)
 	}
 	{
 		// slice of pointers
 		v1 := []*User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 		v2 := []*User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
 		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByID(reflect.TypeOf([]*User{}), "ID"))
-		fmt.Printf("Coalesce(%+v, %+v, MergeByField) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
+		fmt.Printf("Coalesce(%+v, %+v, MergeByID) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
 	}
 	// output:
-	// Coalesce([{ID:1 Name:Alice Age:0} {ID:2 Name:Bob Age:0}], [{ID:2 Name: Age:30} {ID:1 Name: Age:20}], MergeByField) = [{ID:1 Name:Alice Age:20} {ID:2 Name:Bob Age:30}]
-	// Coalesce([&{ID:1 Name:Alice Age:0} &{ID:2 Name:Bob Age:0}], [&{ID:2 Name: Age:30} &{ID:1 Name: Age:20}], MergeByField) = [&{ID:1 Name:Alice Age:20} &{ID:2 Name:Bob Age:30}]
+	// Coalesce([{ID:1 Name:Alice Age:0} {ID:2 Name:Bob Age:0}], [{ID:2 Name: Age:30} {ID:1 Name: Age:20}], MergeByID) = [{ID:1 Name:Alice Age:20} {ID:2 Name:Bob Age:30}]
+	// Coalesce([&{ID:1 Name:Alice Age:0} &{ID:2 Name:Bob Age:0}], [&{ID:2 Name: Age:30} &{ID:1 Name: Age:20}], MergeByID) = [&{ID:1 Name:Alice Age:20} &{ID:2 Name:Bob Age:30}]
 }
 
 func ExampleWithMergeByKeyFunc() {
@@ -275,7 +275,7 @@ func ExampleWithMergeByKeyFunc() {
 			return v.FieldByName("ID"), nil
 		}
 		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByKeyFunc(reflect.TypeOf([]User{}), mergeKeyFunc))
-		fmt.Printf("Coalesce(%+v, %+v, MergeByKey) = %+v\n", v1, v2, coalesced)
+		fmt.Printf("Coalesce(%+v, %+v, MergeByKeyFunc) = %+v\n", v1, v2, coalesced)
 	}
 	{
 		v1 := []*User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
@@ -284,11 +284,11 @@ func ExampleWithMergeByKeyFunc() {
 			return v.Elem().FieldByName("ID"), nil
 		}
 		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByKeyFunc(reflect.TypeOf([]*User{}), mergeKeyFunc))
-		fmt.Printf("Coalesce(%+v, %+v, MergeByKey) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
+		fmt.Printf("Coalesce(%+v, %+v, MergeByKeyFunc) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))
 	}
 	// output:
-	// Coalesce([{ID:1 Name:Alice Age:0} {ID:2 Name:Bob Age:0}], [{ID:2 Name: Age:30} {ID:1 Name: Age:20}], MergeByKey) = [{ID:1 Name:Alice Age:20} {ID:2 Name:Bob Age:30}]
-	// Coalesce([&{ID:1 Name:Alice Age:0} &{ID:2 Name:Bob Age:0}], [&{ID:2 Name: Age:30} &{ID:1 Name: Age:20}], MergeByKey) = [&{ID:1 Name:Alice Age:20} &{ID:2 Name:Bob Age:30}]
+	// Coalesce([{ID:1 Name:Alice Age:0} {ID:2 Name:Bob Age:0}], [{ID:2 Name: Age:30} {ID:1 Name: Age:20}], MergeByKeyFunc) = [{ID:1 Name:Alice Age:20} {ID:2 Name:Bob Age:30}]
+	// Coalesce([&{ID:1 Name:Alice Age:0} &{ID:2 Name:Bob Age:0}], [&{ID:2 Name: Age:30} &{ID:1 Name: Age:20}], MergeByKeyFunc) = [&{ID:1 Name:Alice Age:20} &{ID:2 Name:Bob Age:30}]
 }
 
 func ExampleWithTypeCoalescer() {

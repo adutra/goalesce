@@ -125,8 +125,7 @@ this option, the non-empty slice is returned.
 ```go
 v1 = []int{1, 2}
 v2 = []int{} // empty slice will be considered zero-value
-sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithZeroEmptySlice())
-coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithZeroEmptySlice())
 fmt.Printf("Coalesce(%+v, %+v, ZeroEmptySlice) = %+v\n", v1, v2, coalesced)
 ```
 
@@ -142,8 +141,7 @@ elements from both slices, but no duplicates:
 ```go
 v1 := []int{1, 2}
 v2 := []int{2, 3}
-sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultSetUnion())
-coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithDefaultSetUnion())
 fmt.Printf("Coalesce(%v, %v, SetUnion) = %v\n", coalesced)
 ```
 
@@ -159,8 +157,7 @@ equal to a non-nil pointer to the zero-value_:
 intPtr := func(i int) *int { return &i }
 v1 := []*int{new(int), intPtr(0)} // new(int) and intPtr(0) are equal and point both to the zero-value (0)
 v2 := []*int{nil, intPtr(1)}      // nil will be coalesced as the zero-value (0)
-sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultSetUnion())
-coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithDefaultSetUnion())
 for i, elem := range coalesced.([]*int) {
     fmt.Printf("%v: %T %v\n", i, elem, *elem)
 }
@@ -172,7 +169,7 @@ Output:
     1: *int 1
 
 This strategy is fine for slices of scalars and pointers thereof, but it is not recommended for slices of complex 
-types as the elements may not be fully comparable.
+types as the elements may not be fully comparable. Also, it is not suitable for slices of double pointers.
 
 The resulting slice's element order is deterministic: each element appears in the order it was first encountered when 
 iterating over the two slices.
@@ -184,8 +181,7 @@ The "list-append" strategy appends the second slice to the first one (possibly r
 ```go
 v1 := []int{1, 2}
 v2 := []int{2, 3}
-sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultListAppend())
-coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithDefaultListAppend())
 fmt.Printf("Coalesce(%v, %v, ListAppend) = %v\n", coalesced)
 ```
 
@@ -202,8 +198,7 @@ The "merge-by-index" strategy can be used to coalesce two slices together using 
 ```go
 v1 := []int{1, 2, 3}
 v2 := []int{-1, -2}
-sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithDefaultMergeByIndex())
-coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithDefaultMergeByIndex())
 fmt.Printf("Coalesce(%v, %v, MergeByIndex) = %v\n", v1, v2, coalesced)
 ```
 
@@ -221,13 +216,12 @@ type User struct {
     Name string
     Age  int
 }
-mergeKeyFunc := func(_ int, v reflect.Value) reflect.Value {
-    return v.FieldByName("Id")
+mergeKeyFunc := func(_ int, v reflect.Value) (reflect.Value, error) {
+    return v.FieldByName("Id"), nil
 }
 v1 := []User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
 v2 := []User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
-sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithMergeByKey(reflect.TypeOf(User{}), mergeKeyFunc))
-coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByKeyFunc(reflect.TypeOf(User{}), mergeKeyFunc))
 fmt.Printf("Coalesce(%+v, %+v) = %+v\n", v1, v2, coalesced)
 ```
 
@@ -241,27 +235,27 @@ The function `mergeKeyFunc` must be of type `SliceMergeKeyFunc`. It will be invo
 slice element to extract a merge key from.
 
 The most common usage for this strategy is to coalesce slices of structs, where the merge key is the name of a primary
-key field. In this case, we can use the `WithMergeByField` option to specify the field name to use as merge key, and 
+key field. In this case, we can use the `WithMergeByID` option to specify the field name to use as merge key, and
 simplify the example above as follows:
 
 ```go
 v1 := []User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
 v2 := []User{{Id: 1, Age: 20}      , {Id: 2, Age: 30}}
-sliceCoalescer := goalesce.NewSliceCoalescer(goalesce.WithMergeByField(reflect.TypeOf(User{}), "Id"))
-coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
-fmt.Printf("Coalesce(%+v, %+v, MergeByField) = %+v\n", v1, v2, coalesced)
+coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByID(reflect.TypeOf(User{}), "Id"))
+fmt.Printf("Coalesce(%+v, %+v, MergeByID) = %+v\n", v1, v2, coalesced)
 ```
 
 Output:
 
-    Coalesce([{Id:1 Name:Alice} {Id:2 Name:Bob}], [{Id:1 Age:20} {Id:2 Age:30}], MergeByField) = [{Id:1 Name:Alice Age:20} {Id:2 Name:Bob Age:30}]
+    Coalesce([{Id:1 Name:Alice} {Id:2 Name:Bob}], [{Id:1 Age:20} {Id:2 Age:30}], MergeByID) = [{Id:1 Name:Alice 
+Age:20} {Id:2 Name:Bob Age:30}]
 
-The option `WithMergeByField` also works out-of-the-box on slices of pointers to structs:
+The option `WithMergeByID` also works out-of-the-box on slices of pointers to structs:
 
 ```go
 v1 := []*User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
 v2 := []*User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
-coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithSliceCoalescer(sliceCoalescer))
+coalesced, _ = goalesce.Coalesce(v1, v2, goalesce.WithMergeByID(reflect.TypeOf(User{}), "Id"))
 jsn, _ := json.MarshalIndent(coalesced, "", "  ")
 fmt.Println(string(jsn))
 ```

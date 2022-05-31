@@ -25,7 +25,7 @@ import (
 
 func Test_mainCoalescer_coalescePointer(t *testing.T) {
 	type foo struct {
-		Int int
+		FieldInt int
 	}
 	type cycle struct {
 		Cycle *cycle
@@ -70,9 +70,9 @@ func Test_mainCoalescer_coalescePointer(t *testing.T) {
 		},
 		{
 			"structs",
-			&foo{Int: 1},
-			&foo{Int: 2},
-			&foo{Int: 2},
+			&foo{FieldInt: 1},
+			&foo{FieldInt: 2},
+			&foo{FieldInt: 2},
 		},
 		{
 			"cycle 1",

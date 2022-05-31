@@ -23,7 +23,7 @@ import (
 
 func Test_coalesceAtomic(t *testing.T) {
 	type foo struct {
-		Int int
+		FieldInt int
 	}
 	tests := []struct {
 		name string

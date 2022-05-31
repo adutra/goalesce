@@ -23,11 +23,11 @@ import (
 
 func TestCoalesce(t *testing.T) {
 	type foo struct {
-		Int int
+		FieldInt int
 	}
 	type bar struct {
-		Int int
-		Foo foo
+		FieldInt int
+		FieldFoo foo
 	}
 	tests := []struct {
 		name string
@@ -129,45 +129,45 @@ func TestCoalesce(t *testing.T) {
 		},
 		{
 			"struct",
-			foo{Int: 1},
-			foo{Int: 2},
+			foo{FieldInt: 1},
+			foo{FieldInt: 2},
 			nil,
-			foo{Int: 2},
+			foo{FieldInt: 2},
 		},
 		{
 			"struct zero",
 			foo{},
-			foo{Int: 0},
+			foo{FieldInt: 0},
 			nil,
 			foo{},
 		},
 		{
 			"struct zero partial 1",
-			foo{Int: 1},
-			foo{Int: 0},
+			foo{FieldInt: 1},
+			foo{FieldInt: 0},
 			nil,
-			foo{Int: 1},
+			foo{FieldInt: 1},
 		},
 		{
 			"struct zero partial 2",
-			foo{Int: 0},
-			foo{Int: 1},
+			foo{FieldInt: 0},
+			foo{FieldInt: 1},
 			nil,
-			foo{Int: 1},
+			foo{FieldInt: 1},
 		},
 		{
 			"struct non zero",
-			bar{Int: 0, Foo: foo{Int: 1}},
-			bar{Int: 1},
+			bar{FieldInt: 0, FieldFoo: foo{FieldInt: 1}},
+			bar{FieldInt: 1},
 			nil,
-			bar{Int: 1, Foo: foo{Int: 1}},
+			bar{FieldInt: 1, FieldFoo: foo{FieldInt: 1}},
 		},
 		{
 			"struct non zero custom coalescer",
-			bar{Int: 0, Foo: foo{Int: 1}},
-			bar{Int: 1},
+			bar{FieldInt: 0, FieldFoo: foo{FieldInt: 1}},
+			bar{FieldInt: 1},
 			[]CoalescerOption{WithAtomicType(reflect.TypeOf(bar{}))},
-			bar{Int: 1},
+			bar{FieldInt: 1},
 		},
 		{
 			"map[int]int",
@@ -178,17 +178,17 @@ func TestCoalesce(t *testing.T) {
 		},
 		{
 			"map[int]foo",
-			map[int]foo{1: {Int: 1}, 3: {Int: 3}},
-			map[int]foo{1: {Int: 2}, 2: {Int: 2}},
+			map[int]foo{1: {FieldInt: 1}, 3: {FieldInt: 3}},
+			map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}},
 			nil,
-			map[int]foo{1: {Int: 2}, 2: {Int: 2}, 3: {Int: 3}},
+			map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}, 3: {FieldInt: 3}},
 		},
 		{
 			"map[int]foo custom coalescer",
-			map[int]foo{1: {Int: 1}, 3: {Int: 3}},
-			map[int]foo{1: {Int: 2}, 2: {Int: 2}},
+			map[int]foo{1: {FieldInt: 1}, 3: {FieldInt: 3}},
+			map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}},
 			[]CoalescerOption{WithAtomicType(reflect.TypeOf(map[int]foo{}))},
-			map[int]foo{1: {Int: 2}, 2: {Int: 2}},
+			map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}},
 		},
 		{
 			"[]int",
@@ -199,17 +199,17 @@ func TestCoalesce(t *testing.T) {
 		},
 		{
 			"[]foo",
-			[]foo{{Int: 1}, {Int: 2}},
-			[]foo{{Int: 3}, {Int: 4}},
+			[]foo{{FieldInt: 1}, {FieldInt: 2}},
+			[]foo{{FieldInt: 3}, {FieldInt: 4}},
 			nil,
-			[]foo{{Int: 3}, {Int: 4}},
+			[]foo{{FieldInt: 3}, {FieldInt: 4}},
 		},
 		{
 			"[2]foo",
-			[2]foo{{Int: 1}, {Int: 2}},
-			[2]foo{{Int: 3}, {Int: 4}},
+			[2]foo{{FieldInt: 1}, {FieldInt: 2}},
+			[2]foo{{FieldInt: 3}, {FieldInt: 4}},
 			nil,
-			[2]foo{{Int: 3}, {Int: 4}},
+			[2]foo{{FieldInt: 3}, {FieldInt: 4}},
 		},
 		{
 			"[]int union",
@@ -227,33 +227,33 @@ func TestCoalesce(t *testing.T) {
 		},
 		{
 			"[]foo custom",
-			[]foo{{Int: 1}, {Int: 2}, {Int: 3}},
-			[]foo{{Int: 3}, {Int: 4}, {Int: 5}},
-			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "Int")},
-			[]foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 4}, {Int: 5}},
+			[]foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
+			[]foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
+			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "FieldInt")},
+			[]foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 		},
 		{
 			"[]*int custom",
-			[]*foo{{Int: 1}, {Int: 2}, {Int: 3}},
-			[]*foo{{Int: 3}, {Int: 4}, {Int: 5}},
+			[]*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
+			[]*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 			[]CoalescerOption{
 				WithMergeByKey(
 					reflect.TypeOf([]*foo{}),
 					func(_ int, v reflect.Value) reflect.Value {
 						i := v.Interface()
-						return reflect.ValueOf(i.(*foo).Int)
+						return reflect.ValueOf(i.(*foo).FieldInt)
 					},
 				)},
-			[]*foo{{Int: 1}, {Int: 2}, {Int: 3}, {Int: 4}, {Int: 5}},
+			[]*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 		},
 		{
 			"[]*int type coalescer",
-			[]*foo{{Int: 1}, {Int: 2}, {Int: 3}},
-			[]*foo{{Int: 3}, {Int: 4}, {Int: 5}},
+			[]*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
+			[]*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 			[]CoalescerOption{
-				WithMergeByField(reflect.TypeOf([]*foo{}), "Int"),
+				WithMergeByField(reflect.TypeOf([]*foo{}), "FieldInt"),
 				WithTypeCoalescer(reflect.TypeOf([]*foo{}), coalesceAtomic)}, // will prevail
-			[]*foo{{Int: 3}, {Int: 4}, {Int: 5}},
+			[]*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 		},
 		{"trilean nil nil", (*bool)(nil), (*bool)(nil), []CoalescerOption{WithTrileans()}, (*bool)(nil)},
 		{"trilean nil false", (*bool)(nil), boolPtr(false), []CoalescerOption{WithTrileans()}, boolPtr(false)},

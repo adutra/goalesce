@@ -26,17 +26,17 @@ import (
 func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		type foo struct {
-			Int int
+			FieldInt int
 		}
 		type bar struct {
-			Int        int
-			Foo        foo
-			IntPtr     *int
-			BarPtr     *bar
-			unexported int
-			Interface  interface{}
-			Map        map[int]string
-			MapAtomic  map[int]string `goalesce:"atomic"`
+			FieldInt       int
+			FieldFoo       foo
+			FieldIntPtr    *int
+			FieldBarPtr    *bar
+			unexported     int
+			FieldInterface interface{}
+			FieldMap       map[int]string
+			FieldMapAtomic map[int]string `goalesce:"atomic"`
 		}
 		tests := []struct {
 			name string
@@ -52,51 +52,51 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 			},
 			{
 				"non zeroes int",
-				bar{Int: 1},
-				bar{Int: 2},
-				bar{Int: 2},
+				bar{FieldInt: 1},
+				bar{FieldInt: 2},
+				bar{FieldInt: 2},
 			},
 			{
 				"non zeroes bar",
-				bar{Foo: foo{Int: 1}},
-				bar{Foo: foo{Int: 2}},
-				bar{Foo: foo{Int: 2}},
+				bar{FieldFoo: foo{FieldInt: 1}},
+				bar{FieldFoo: foo{FieldInt: 2}},
+				bar{FieldFoo: foo{FieldInt: 2}},
 			},
 			{
 				"mixed zeroes intptr1",
-				bar{IntPtr: intPtr(1)},
-				bar{IntPtr: nil},
-				bar{IntPtr: intPtr(1)},
+				bar{FieldIntPtr: intPtr(1)},
+				bar{FieldIntPtr: nil},
+				bar{FieldIntPtr: intPtr(1)},
 			},
 			{
 				"mixed zeroes intptr2",
-				bar{IntPtr: nil},
-				bar{IntPtr: intPtr(2)},
-				bar{IntPtr: intPtr(2)},
+				bar{FieldIntPtr: nil},
+				bar{FieldIntPtr: intPtr(2)},
+				bar{FieldIntPtr: intPtr(2)},
 			},
 			{
 				"mixed zeroes barptr1",
-				bar{BarPtr: &bar{Int: 1}},
-				bar{BarPtr: nil},
-				bar{BarPtr: &bar{Int: 1}},
+				bar{FieldBarPtr: &bar{FieldInt: 1}},
+				bar{FieldBarPtr: nil},
+				bar{FieldBarPtr: &bar{FieldInt: 1}},
 			},
 			{
 				"mixed zeroes barptr 2",
-				bar{BarPtr: nil},
-				bar{BarPtr: &bar{Int: 2}},
-				bar{BarPtr: &bar{Int: 2}},
+				bar{FieldBarPtr: nil},
+				bar{FieldBarPtr: &bar{FieldInt: 2}},
+				bar{FieldBarPtr: &bar{FieldInt: 2}},
 			},
 			{
 				"non zeroes intptr",
-				bar{IntPtr: intPtr(1)},
-				bar{IntPtr: intPtr(2)},
-				bar{IntPtr: intPtr(2)},
+				bar{FieldIntPtr: intPtr(1)},
+				bar{FieldIntPtr: intPtr(2)},
+				bar{FieldIntPtr: intPtr(2)},
 			},
 			{
 				"non zeroes barptr",
-				bar{BarPtr: &bar{Int: 1}},
-				bar{BarPtr: &bar{Int: 2}},
-				bar{BarPtr: &bar{Int: 2}},
+				bar{FieldBarPtr: &bar{FieldInt: 1}},
+				bar{FieldBarPtr: &bar{FieldInt: 2}},
+				bar{FieldBarPtr: &bar{FieldInt: 2}},
 			},
 			{
 				"non zeroes unexported",
@@ -106,39 +106,39 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 			},
 			{
 				"field interface different types",
-				bar{Interface: 1},
-				bar{Interface: "abc"},
-				bar{Interface: "abc"},
+				bar{FieldInterface: 1},
+				bar{FieldInterface: "abc"},
+				bar{FieldInterface: "abc"},
 			},
 			{
 				"field interface nil 1",
-				bar{Interface: &foo{Int: 1}},
-				bar{Interface: nil},
-				bar{Interface: &foo{Int: 1}},
+				bar{FieldInterface: &foo{FieldInt: 1}},
+				bar{FieldInterface: nil},
+				bar{FieldInterface: &foo{FieldInt: 1}},
 			},
 			{
 				"field interface nil 2",
-				bar{Interface: nil},
-				bar{Interface: &foo{Int: 1}},
-				bar{Interface: &foo{Int: 1}},
+				bar{FieldInterface: nil},
+				bar{FieldInterface: &foo{FieldInt: 1}},
+				bar{FieldInterface: &foo{FieldInt: 1}},
 			},
 			{
 				"field interface same types",
-				bar{Interface: &bar{Int: 1, Map: map[int]string{1: "a"}}},
-				bar{Interface: &bar{Int: 0, Map: map[int]string{2: "b"}}},
-				bar{Interface: &bar{Int: 1, Map: map[int]string{1: "a", 2: "b"}}},
+				bar{FieldInterface: &bar{FieldInt: 1, FieldMap: map[int]string{1: "a"}}},
+				bar{FieldInterface: &bar{FieldInt: 0, FieldMap: map[int]string{2: "b"}}},
+				bar{FieldInterface: &bar{FieldInt: 1, FieldMap: map[int]string{1: "a", 2: "b"}}},
 			},
 			{
 				"field map",
-				bar{Map: map[int]string{1: "a", 2: "b"}},
-				bar{Map: map[int]string{2: "a", 3: "b"}},
-				bar{Map: map[int]string{1: "a", 2: "a", 3: "b"}},
+				bar{FieldMap: map[int]string{1: "a", 2: "b"}},
+				bar{FieldMap: map[int]string{2: "a", 3: "b"}},
+				bar{FieldMap: map[int]string{1: "a", 2: "a", 3: "b"}},
 			},
 			{
 				"field map atomic",
-				bar{MapAtomic: map[int]string{1: "a", 2: "b"}},
-				bar{MapAtomic: map[int]string{2: "a", 3: "b"}},
-				bar{MapAtomic: map[int]string{2: "a", 3: "b"}},
+				bar{FieldMapAtomic: map[int]string{1: "a", 2: "b"}},
+				bar{FieldMapAtomic: map[int]string{2: "a", 3: "b"}},
+				bar{FieldMapAtomic: map[int]string{2: "a", 3: "b"}},
 			},
 			{
 				"non zeroes unexported",
@@ -158,28 +158,28 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 	})
 	t.Run("slice fields", func(t *testing.T) {
 		type foo struct {
-			Int    int
-			IntPtr *int
+			FieldInt    int
+			FieldIntPtr *int
 		}
 		type nested struct {
-			Key    int
-			NonKey string
-			Ints   []int
+			FieldKey    int
+			FieldNonKey string
+			FieldInts   []int
 		}
 		type bar struct {
-			Ints            []int
-			IntsAtomic      []int `goalesce:"atomic"`
-			IntsUnion       []int `goalesce:"union"`
-			IntsAppend      []int `goalesce:"append"`
-			IntsIndex       []int `goalesce:"index"`
-			Foos            []foo
-			FoosAtomic      []foo    `goalesce:"atomic"`
-			FoosUnion       []foo    `goalesce:"union"`
-			FoosAppend      []foo    `goalesce:"append"`
-			FoosIndex       []foo    `goalesce:"index"`
-			FoosMergeKey    []foo    `goalesce:"merge,Int"`
-			FooPtrsMergeKey []*foo   `goalesce:"merge,IntPtr"`
-			NestedSlice     []nested `goalesce:"merge,Key"`
+			FieldInts            []int
+			FieldIntsAtomic      []int `goalesce:"atomic"`
+			FieldIntsUnion       []int `goalesce:"union"`
+			FieldIntsAppend      []int `goalesce:"append"`
+			FieldIntsIndex       []int `goalesce:"index"`
+			FieldFoos            []foo
+			FieldFoosAtomic      []foo    `goalesce:"atomic"`
+			FieldFoosUnion       []foo    `goalesce:"union"`
+			FieldFoosAppend      []foo    `goalesce:"append"`
+			FieldFoosIndex       []foo    `goalesce:"index"`
+			FieldFoosMergeKey    []foo    `goalesce:"merge,FieldInt"`
+			FieldFooPtrsMergeKey []*foo   `goalesce:"merge,FieldIntPtr"`
+			FieldNestedSlice     []nested `goalesce:"merge,FieldKey"`
 		}
 		tests := []struct {
 			name string
@@ -189,81 +189,81 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 		}{
 			{
 				"slice ints default",
-				bar{Ints: []int{1, 2}},
-				bar{Ints: []int{2, 3}},
-				bar{Ints: []int{2, 3}},
+				bar{FieldInts: []int{1, 2}},
+				bar{FieldInts: []int{2, 3}},
+				bar{FieldInts: []int{2, 3}},
 			},
 			{
 				"slice ints atomic",
-				bar{IntsAtomic: []int{1, 2}},
-				bar{IntsAtomic: []int{2, 3}},
-				bar{IntsAtomic: []int{2, 3}},
+				bar{FieldIntsAtomic: []int{1, 2}},
+				bar{FieldIntsAtomic: []int{2, 3}},
+				bar{FieldIntsAtomic: []int{2, 3}},
 			},
 			{
 				"slice ints union",
-				bar{IntsUnion: []int{1, 2}},
-				bar{IntsUnion: []int{2, 3}},
-				bar{IntsUnion: []int{1, 2, 3}},
+				bar{FieldIntsUnion: []int{1, 2}},
+				bar{FieldIntsUnion: []int{2, 3}},
+				bar{FieldIntsUnion: []int{1, 2, 3}},
 			},
 			{
 				"slice ints append",
-				bar{IntsAppend: []int{1, 2}},
-				bar{IntsAppend: []int{2, 3}},
-				bar{IntsAppend: []int{1, 2, 2, 3}},
+				bar{FieldIntsAppend: []int{1, 2}},
+				bar{FieldIntsAppend: []int{2, 3}},
+				bar{FieldIntsAppend: []int{1, 2, 2, 3}},
 			},
 			{
 				"slice ints index",
-				bar{IntsIndex: []int{1, 2, 3}},
-				bar{IntsIndex: []int{-1, -2}},
-				bar{IntsIndex: []int{-1, -2, 3}},
+				bar{FieldIntsIndex: []int{1, 2, 3}},
+				bar{FieldIntsIndex: []int{-1, -2}},
+				bar{FieldIntsIndex: []int{-1, -2, 3}},
 			},
 			{
 				"slice foos default",
-				bar{Foos: []foo{{Int: 1}, {Int: 2}}},
-				bar{Foos: []foo{{Int: 2}, {Int: 3}}},
-				bar{Foos: []foo{{Int: 2}, {Int: 3}}},
+				bar{FieldFoos: []foo{{FieldInt: 1}, {FieldInt: 2}}},
+				bar{FieldFoos: []foo{{FieldInt: 2}, {FieldInt: 3}}},
+				bar{FieldFoos: []foo{{FieldInt: 2}, {FieldInt: 3}}},
 			},
 			{
 				"slice foos atomic",
-				bar{FoosAtomic: []foo{{Int: 1}, {Int: 2}}},
-				bar{FoosAtomic: []foo{{Int: 2}, {Int: 3}}},
-				bar{FoosAtomic: []foo{{Int: 2}, {Int: 3}}},
+				bar{FieldFoosAtomic: []foo{{FieldInt: 1}, {FieldInt: 2}}},
+				bar{FieldFoosAtomic: []foo{{FieldInt: 2}, {FieldInt: 3}}},
+				bar{FieldFoosAtomic: []foo{{FieldInt: 2}, {FieldInt: 3}}},
 			},
 			{
 				"slice foos union",
-				bar{FoosUnion: []foo{{Int: 1}, {Int: 2}}},
-				bar{FoosUnion: []foo{{Int: 2}, {Int: 3}}},
-				bar{FoosUnion: []foo{{Int: 1}, {Int: 2}, {Int: 3}}},
+				bar{FieldFoosUnion: []foo{{FieldInt: 1}, {FieldInt: 2}}},
+				bar{FieldFoosUnion: []foo{{FieldInt: 2}, {FieldInt: 3}}},
+				bar{FieldFoosUnion: []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}}},
 			},
 			{
 				"slice foos append",
-				bar{FoosAppend: []foo{{Int: 1}, {Int: 2}}},
-				bar{FoosAppend: []foo{{Int: 2}, {Int: 3}}},
-				bar{FoosAppend: []foo{{Int: 1}, {Int: 2}, {Int: 2}, {Int: 3}}},
+				bar{FieldFoosAppend: []foo{{FieldInt: 1}, {FieldInt: 2}}},
+				bar{FieldFoosAppend: []foo{{FieldInt: 2}, {FieldInt: 3}}},
+				bar{FieldFoosAppend: []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 2}, {FieldInt: 3}}},
 			},
 			{
 				"slice foos index",
-				bar{FoosIndex: []foo{{Int: 1}, {Int: 2}, {Int: 3}}},
-				bar{FoosIndex: []foo{{Int: -1}, {Int: -2}}},
-				bar{FoosIndex: []foo{{Int: -1}, {Int: -2}, {Int: 3}}},
+				bar{FieldFoosIndex: []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}}},
+				bar{FieldFoosIndex: []foo{{FieldInt: -1}, {FieldInt: -2}}},
+				bar{FieldFoosIndex: []foo{{FieldInt: -1}, {FieldInt: -2}, {FieldInt: 3}}},
 			},
 			{
 				"slice foos merge key",
-				bar{FoosMergeKey: []foo{{Int: 1}, {Int: 2}}},
-				bar{FoosMergeKey: []foo{{Int: 2}, {Int: 3}}},
-				bar{FoosMergeKey: []foo{{Int: 1}, {Int: 2}, {Int: 3}}},
+				bar{FieldFoosMergeKey: []foo{{FieldInt: 1}, {FieldInt: 2}}},
+				bar{FieldFoosMergeKey: []foo{{FieldInt: 2}, {FieldInt: 3}}},
+				bar{FieldFoosMergeKey: []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}}},
 			},
 			{
 				"slice foo ptrs merge key",
-				bar{FooPtrsMergeKey: []*foo{{IntPtr: intPtr(1)}, {IntPtr: intPtr(2)}}},
-				bar{FooPtrsMergeKey: []*foo{{IntPtr: intPtr(2)}, {IntPtr: intPtr(3)}}},
-				bar{FooPtrsMergeKey: []*foo{{IntPtr: intPtr(1)}, {IntPtr: intPtr(2)}, {IntPtr: intPtr(3)}}},
+				bar{FieldFooPtrsMergeKey: []*foo{{FieldIntPtr: intPtr(1)}, {FieldIntPtr: intPtr(2)}}},
+				bar{FieldFooPtrsMergeKey: []*foo{{FieldIntPtr: intPtr(2)}, {FieldIntPtr: intPtr(3)}}},
+				bar{FieldFooPtrsMergeKey: []*foo{{FieldIntPtr: intPtr(1)}, {FieldIntPtr: intPtr(2)}, {FieldIntPtr: intPtr(3)}}},
 			},
 			{
 				"nested slice",
-				bar{NestedSlice: []nested{{Key: 1, NonKey: "abc", Ints: []int{1, 2}}}},
-				bar{NestedSlice: []nested{{Key: 1, NonKey: "def", Ints: []int{2, 3}}}},
-				bar{NestedSlice: []nested{{Key: 1, NonKey: "def", Ints: []int{2, 3}}}},
+				bar{FieldNestedSlice: []nested{{FieldKey: 1, FieldNonKey: "abc", FieldInts: []int{1, 2}}}},
+				bar{FieldNestedSlice: []nested{{FieldKey: 1, FieldNonKey: "def", FieldInts: []int{2, 3}}}},
+				bar{FieldNestedSlice: []nested{{FieldKey: 1, FieldNonKey: "def", FieldInts: []int{2, 3}}}},
 			},
 		}
 		for _, tt := range tests {
@@ -278,60 +278,60 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 	t.Run("options", func(t *testing.T) {
 		t.Run("field coalescer", func(t *testing.T) {
 			type foo struct {
-				Ints []int
+				FieldInts []int
 			}
-			coalescer := NewCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "Ints", coalesceSliceAppend))
-			got, err := coalescer(reflect.ValueOf(foo{Ints: []int{1, 2}}), reflect.ValueOf(foo{Ints: []int{2, 3}}))
+			coalescer := NewCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "FieldInts", coalesceSliceAppend))
+			got, err := coalescer(reflect.ValueOf(foo{FieldInts: []int{1, 2}}), reflect.ValueOf(foo{FieldInts: []int{2, 3}}))
 			require.NoError(t, err)
-			assert.Equal(t, foo{Ints: []int{1, 2, 2, 3}}, got.Interface())
+			assert.Equal(t, foo{FieldInts: []int{1, 2, 2, 3}}, got.Interface())
 		})
 		t.Run("atomic field", func(t *testing.T) {
 			type foo struct {
-				Ints map[int]string
+				FieldInts map[int]string
 			}
-			coalescer := NewCoalescer(WithAtomicField(reflect.TypeOf(foo{}), "Ints"))
+			coalescer := NewCoalescer(WithAtomicField(reflect.TypeOf(foo{}), "FieldInts"))
 			got, err := coalescer(
-				reflect.ValueOf(foo{Ints: map[int]string{1: "abc"}}),
-				reflect.ValueOf(foo{Ints: map[int]string{1: "def"}}),
+				reflect.ValueOf(foo{FieldInts: map[int]string{1: "abc"}}),
+				reflect.ValueOf(foo{FieldInts: map[int]string{1: "def"}}),
 			)
 			require.NoError(t, err)
-			assert.Equal(t, foo{Ints: map[int]string{1: "def"}}, got.Interface())
+			assert.Equal(t, foo{FieldInts: map[int]string{1: "def"}}, got.Interface())
 		})
 	})
 	t.Run("tag errors", func(t *testing.T) {
 		type foo struct {
-			Int int
+			FieldInt int
 		}
 		type unknownStrategy struct {
-			Ints []int `goalesce:"unknown"`
+			FieldInts []int `goalesce:"unknown"`
 		}
 		type invalidAppend struct {
-			Int int `goalesce:"append"`
+			FieldInt int `goalesce:"append"`
 		}
 		type invalidUnion struct {
-			Int int `goalesce:"union"`
+			FieldInt int `goalesce:"union"`
 		}
 		type invalidIndex struct {
-			Int int `goalesce:"index"`
+			FieldInt int `goalesce:"index"`
 		}
 		type invalidMerge struct {
-			Int int `goalesce:"merge"`
+			FieldInt int `goalesce:"merge"`
 		}
 		type missingKey struct {
-			Ints []int `goalesce:"merge"`
+			FieldInts []int `goalesce:"merge"`
 		}
 		type missingKey2 struct {
-			Ints []int `goalesce:"merge,"`
+			FieldInts []int `goalesce:"merge,"`
 		}
 		type missingKey3 struct {
-			Ints []int `goalesce:"merge key"`
+			FieldInts []int `goalesce:"merge key"`
 		}
 		type wrongElemType struct {
-			Ints []int `goalesce:"merge,irrelevant"`
+			FieldInts []int `goalesce:"merge,irrelevant"`
 		}
 		type unknownField struct {
-			Foos    []foo  `goalesce:"merge,unknown"`
-			FooPtrs []*foo `goalesce:"merge,unknown"`
+			FieldFoos    []foo  `goalesce:"merge,unknown"`
+			FieldFooPtrs []*foo `goalesce:"merge,unknown"`
 		}
 		tests := []struct {
 			name string
@@ -341,69 +341,69 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 		}{
 			{
 				"unknown strategy",
-				unknownStrategy{Ints: []int{1, 2}},
-				unknownStrategy{Ints: []int{2, 3}},
-				"field goalesce.unknownStrategy.Ints: unknown coalesce strategy: unknown",
+				unknownStrategy{FieldInts: []int{1, 2}},
+				unknownStrategy{FieldInts: []int{2, 3}},
+				"field goalesce.unknownStrategy.FieldInts: unknown coalesce strategy: unknown",
 			},
 			{
 				"invalid append",
-				invalidAppend{Int: 1},
-				invalidAppend{Int: 2},
-				"field goalesce.invalidAppend.Int: append strategy is only supported for slices",
+				invalidAppend{FieldInt: 1},
+				invalidAppend{FieldInt: 2},
+				"field goalesce.invalidAppend.FieldInt: append strategy is only supported for slices",
 			},
 			{
 				"invalid union",
-				invalidUnion{Int: 1},
-				invalidUnion{Int: 2},
-				"field goalesce.invalidUnion.Int: union strategy is only supported for slices",
+				invalidUnion{FieldInt: 1},
+				invalidUnion{FieldInt: 2},
+				"field goalesce.invalidUnion.FieldInt: union strategy is only supported for slices",
 			},
 			{
 				"invalid index",
-				invalidIndex{Int: 1},
-				invalidIndex{Int: 2},
-				"field goalesce.invalidIndex.Int: index strategy is only supported for slices",
+				invalidIndex{FieldInt: 1},
+				invalidIndex{FieldInt: 2},
+				"field goalesce.invalidIndex.FieldInt: index strategy is only supported for slices",
 			},
 			{
 				"invalid merge",
-				invalidMerge{Int: 1},
-				invalidMerge{Int: 2},
-				"field goalesce.invalidMerge.Int: merge strategy is only supported for slices",
+				invalidMerge{FieldInt: 1},
+				invalidMerge{FieldInt: 2},
+				"field goalesce.invalidMerge.FieldInt: merge strategy is only supported for slices",
 			},
 			{
 				"missing merge key",
-				missingKey{Ints: []int{1}},
-				missingKey{Ints: []int{2}},
-				"field goalesce.missingKey.Ints: merge strategy must be followed by a comma and the merge key",
+				missingKey{FieldInts: []int{1}},
+				missingKey{FieldInts: []int{2}},
+				"field goalesce.missingKey.FieldInts: merge strategy must be followed by a comma and the merge key",
 			},
 			{
 				"missing merge key 2",
-				missingKey2{Ints: []int{1}},
-				missingKey2{Ints: []int{2}},
-				"field goalesce.missingKey2.Ints: merge strategy must be followed by a comma and the merge key",
+				missingKey2{FieldInts: []int{1}},
+				missingKey2{FieldInts: []int{2}},
+				"field goalesce.missingKey2.FieldInts: merge strategy must be followed by a comma and the merge key",
 			},
 			{
 				"missing merge key 3",
-				missingKey3{Ints: []int{1}},
-				missingKey3{Ints: []int{2}},
-				"field goalesce.missingKey3.Ints: merge strategy must be followed by a comma and the merge key",
+				missingKey3{FieldInts: []int{1}},
+				missingKey3{FieldInts: []int{2}},
+				"field goalesce.missingKey3.FieldInts: merge strategy must be followed by a comma and the merge key",
 			},
 			{
 				"wrong element type",
-				wrongElemType{Ints: []int{1}},
-				wrongElemType{Ints: []int{2}},
-				"field goalesce.wrongElemType.Ints: expecting slice of struct or pointer thereto, got: []int",
+				wrongElemType{FieldInts: []int{1}},
+				wrongElemType{FieldInts: []int{2}},
+				"field goalesce.wrongElemType.FieldInts: expecting slice of struct or pointer thereto, got: []int",
 			},
 			{
 				"unknown field",
-				unknownField{Foos: []foo{{Int: 1}}},
-				unknownField{Foos: []foo{{Int: 2}}},
-				"field goalesce.unknownField.Foos: slice element type goalesce.foo has no field named unknown",
+				unknownField{FieldFoos: []foo{{FieldInt: 1}}},
+				unknownField{FieldFoos: []foo{{FieldInt: 2}}},
+				"field goalesce.unknownField.FieldFoos: slice element type goalesce.foo has no field named unknown",
 			},
 			{
 				"unknown field ptr",
-				unknownField{FooPtrs: []*foo{{Int: 1}}},
-				unknownField{FooPtrs: []*foo{{Int: 2}}},
-				"field goalesce.unknownField.Foos: slice element type goalesce.foo has no field named unknown",
+				unknownField{FieldFooPtrs: []*foo{{FieldInt: 1}}},
+				unknownField{FieldFooPtrs: []*foo{{FieldInt: 2}}},
+				"field goalesce.unknownField.FieldFoos: slice element type goalesce.foo has no field named unknown",
 			},
 		}
 		for _, tt := range tests {
@@ -416,12 +416,12 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 	})
 	t.Run("fallback error", func(t *testing.T) {
 		type foo struct {
-			Int int
+			FieldInt int
 		}
 		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
 			return reflect.Value{}, errors.New("fake")
 		}))
-		_, err := coalescer(reflect.ValueOf(foo{Int: 1}), reflect.ValueOf(foo{Int: 2}))
+		_, err := coalescer(reflect.ValueOf(foo{FieldInt: 1}), reflect.ValueOf(foo{FieldInt: 2}))
 		assert.EqualError(t, err, "fake")
 	})
 }

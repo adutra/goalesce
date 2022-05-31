@@ -185,9 +185,9 @@ func TestWithMergeByKey(t *testing.T) {
 	}
 	c := &mainCoalescer{}
 	called := false
-	mergeKeyFunc := func(index int, element reflect.Value) (key reflect.Value) {
+	mergeKeyFunc := func(index int, element reflect.Value) (key reflect.Value, err error) {
 		called = true
-		return element.FieldByName("ID")
+		return element.FieldByName("ID"), nil
 	}
 	WithMergeByKeyFunc(reflect.TypeOf([]User{}), mergeKeyFunc)(c)
 	assert.NotNil(t, c.sliceCoalescers[reflect.TypeOf([]User{})])

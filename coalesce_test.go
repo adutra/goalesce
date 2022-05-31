@@ -239,9 +239,9 @@ func TestCoalesce(t *testing.T) {
 			[]CoalescerOption{
 				WithMergeByKeyFunc(
 					reflect.TypeOf([]*foo{}),
-					func(_ int, v reflect.Value) reflect.Value {
+					func(_ int, v reflect.Value) (reflect.Value, error) {
 						i := v.Interface()
-						return reflect.ValueOf(i.(*foo).FieldInt)
+						return reflect.ValueOf(i.(*foo).FieldInt), nil
 					},
 				)},
 			[]*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},

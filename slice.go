@@ -23,20 +23,20 @@ import (
 // may be the zero-value for the slice element type, but it will never be an invalid value. The returned merge key can
 // be a zero-value, but cannot be invalid; moreover, it must be comparable as it will be stored internally in a
 // temporary map during the merge.
-type SliceMergeKeyFunc func(index int, element reflect.Value) (key reflect.Value)
+type SliceMergeKeyFunc func(index int, element reflect.Value) (key reflect.Value, err error)
 
 // SliceUnion is a merge key func that returns the elements themselves as keys, thus achieving set-union semantics. If
 // the elements are pointers, they are dereferenced, which means that the set-union semantics will apply to the pointer
 // targets, not to the pointers themselves. When using this func to do slice merges, the resulting slices will have no
 // duplicate items (that is, items having the same merge key).
-var SliceUnion SliceMergeKeyFunc = func(index int, element reflect.Value) (key reflect.Value) {
-	return safeIndirect(element)
+var SliceUnion SliceMergeKeyFunc = func(index int, element reflect.Value) (key reflect.Value, err error) {
+	return safeIndirect(element), nil
 }
 
 // SliceIndex is a merge key func that returns the element indices as keys, thus achieving merge-by-index semantics.
 // When using this func to do slice merges, the resulting slices will have their elements coalesced index by index.
-var SliceIndex SliceMergeKeyFunc = func(index int, element reflect.Value) (key reflect.Value) {
-	return reflect.ValueOf(index)
+var SliceIndex SliceMergeKeyFunc = func(index int, element reflect.Value) (key reflect.Value, err error) {
+	return reflect.ValueOf(index), nil
 }
 
 func (c *mainCoalescer) coalesceSlice(v1, v2 reflect.Value) (reflect.Value, error) {
@@ -86,8 +86,10 @@ func (c *mainCoalescer) coalesceSliceMerge(v1, v2 reflect.Value, mergeKeyFunc Sl
 	m1 := reflect.MakeMap(reflect.MapOf(typeOfInterface, v1.Type().Elem()))
 	for i := 0; i < v1.Len(); i++ {
 		v := v1.Index(i)
-		k := mergeKeyFunc(i, v)
-		if err := checkMergeKey(k); err != nil {
+		k, err := mergeKeyFunc(i, v)
+		if err != nil {
+			return reflect.Value{}, err
+		} else if err := checkMergeKey(k); err != nil {
 			return reflect.Value{}, err
 		}
 		if !m1.MapIndex(k).IsValid() {
@@ -98,8 +100,10 @@ func (c *mainCoalescer) coalesceSliceMerge(v1, v2 reflect.Value, mergeKeyFunc Sl
 	m2 := reflect.MakeMap(reflect.MapOf(typeOfInterface, v2.Type().Elem()))
 	for i := 0; i < v2.Len(); i++ {
 		v := v2.Index(i)
-		k := mergeKeyFunc(i, v)
-		if err := checkMergeKey(k); err != nil {
+		k, err := mergeKeyFunc(i, v)
+		if err != nil {
+			return reflect.Value{}, err
+		} else if err := checkMergeKey(k); err != nil {
 			return reflect.Value{}, err
 		}
 		if !m1.MapIndex(k).IsValid() && !m2.MapIndex(k).IsValid() {

@@ -30,11 +30,11 @@ func Test_mainCoalescer_coalesceSlice(t *testing.T) {
 	type bar struct {
 		FieldIntPtr *int
 	}
-	fooMergeFunc := func(_ int, value reflect.Value) reflect.Value {
+	fooMergeFunc := func(_ int, value reflect.Value) (reflect.Value, error) {
 		elem := value.Interface().(foo)
-		return reflect.ValueOf(elem.FieldInt)
+		return reflect.ValueOf(elem.FieldInt), nil
 	}
-	barPtrMergeFunc := func(_ int, value reflect.Value) reflect.Value {
+	barPtrMergeFunc := func(_ int, value reflect.Value) (reflect.Value, error) {
 		elem := value.Interface().(*bar)
 		if elem == nil {
 			elem = &bar{}
@@ -43,9 +43,9 @@ func Test_mainCoalescer_coalesceSlice(t *testing.T) {
 			elem.FieldIntPtr = new(int)
 		}
 		key := *elem.FieldIntPtr
-		return reflect.ValueOf(key)
+		return reflect.ValueOf(key), nil
 	}
-	barPtrInterfaceMergeFunc := func(i int, value reflect.Value) reflect.Value {
+	barPtrInterfaceMergeFunc := func(i int, value reflect.Value) (reflect.Value, error) {
 		var elem *bar
 		if !value.IsNil() {
 			elem = value.Interface().(*bar)
@@ -57,7 +57,7 @@ func Test_mainCoalescer_coalesceSlice(t *testing.T) {
 			elem.FieldIntPtr = new(int)
 		}
 		key := *elem.FieldIntPtr
-		return reflect.ValueOf(key)
+		return reflect.ValueOf(key), nil
 	}
 	tests := []struct {
 		name string
@@ -1527,19 +1527,26 @@ func Test_mainCoalescer_coalesceSlice(t *testing.T) {
 		assert.EqualError(t, err, "fake")
 	})
 	t.Run("merge key func errors", func(t *testing.T) {
-		coalescer := NewCoalescer(WithMergeByKeyFunc(reflect.TypeOf([]int{}), func(int, reflect.Value) reflect.Value {
-			return reflect.Value{}
+		coalescer := NewCoalescer(WithMergeByKeyFunc(reflect.TypeOf([]int{}), func(int, reflect.Value) (reflect.Value, error) {
+			return reflect.Value{}, nil
 		}))
 		_, err := coalescer(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{}))
 		assert.EqualError(t, err, "slice merge key func returned nil")
 		_, err = coalescer(reflect.ValueOf([]int{}), reflect.ValueOf([]int{1}))
 		assert.EqualError(t, err, "slice merge key func returned nil")
-		coalescer = NewCoalescer(WithMergeByKeyFunc(reflect.TypeOf([]int{}), func(int, reflect.Value) reflect.Value {
-			return reflect.ValueOf([]int{1, 2, 3})
+		coalescer = NewCoalescer(WithMergeByKeyFunc(reflect.TypeOf([]int{}), func(int, reflect.Value) (reflect.Value, error) {
+			return reflect.ValueOf([]int{1, 2, 3}), nil
 		}))
 		_, err = coalescer(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{}))
 		assert.EqualError(t, err, "slice merge key [1 2 3] of type []int is not comparable")
 		_, err = coalescer(reflect.ValueOf([]int{}), reflect.ValueOf([]int{1}))
 		assert.EqualError(t, err, "slice merge key [1 2 3] of type []int is not comparable")
+		coalescer = NewCoalescer(WithMergeByKeyFunc(reflect.TypeOf([]int{}), func(int, reflect.Value) (reflect.Value, error) {
+			return reflect.Value{}, errors.New("merge key func error")
+		}))
+		_, err = coalescer(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{}))
+		assert.EqualError(t, err, "merge key func error")
+		_, err = coalescer(reflect.ValueOf([]int{}), reflect.ValueOf([]int{1}))
+		assert.EqualError(t, err, "merge key func error")
 	})
 }

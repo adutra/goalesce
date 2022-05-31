@@ -271,8 +271,8 @@ func ExampleWithMergeByKeyFunc() {
 	{
 		v1 := []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 		v2 := []User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
-		mergeKeyFunc := func(_ int, v reflect.Value) reflect.Value {
-			return v.FieldByName("ID")
+		mergeKeyFunc := func(_ int, v reflect.Value) (reflect.Value, error) {
+			return v.FieldByName("ID"), nil
 		}
 		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByKeyFunc(reflect.TypeOf([]User{}), mergeKeyFunc))
 		fmt.Printf("Coalesce(%+v, %+v, MergeByKey) = %+v\n", v1, v2, coalesced)
@@ -280,8 +280,8 @@ func ExampleWithMergeByKeyFunc() {
 	{
 		v1 := []*User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 		v2 := []*User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
-		mergeKeyFunc := func(_ int, v reflect.Value) reflect.Value {
-			return v.Elem().FieldByName("ID")
+		mergeKeyFunc := func(_ int, v reflect.Value) (reflect.Value, error) {
+			return v.Elem().FieldByName("ID"), nil
 		}
 		coalesced, _ := goalesce.Coalesce(v1, v2, goalesce.WithMergeByKeyFunc(reflect.TypeOf([]*User{}), mergeKeyFunc))
 		fmt.Printf("Coalesce(%+v, %+v, MergeByKey) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(coalesced))

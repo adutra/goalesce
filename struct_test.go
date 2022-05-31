@@ -285,6 +285,17 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, foo{FieldInts: []int{1, 2, 2, 3}}, got.Interface())
 		})
+		t.Run("field coalescer provider", func(t *testing.T) {
+			type foo struct {
+				FieldInts []int
+			}
+			coalescer := NewCoalescer(WithFieldCoalescerProvider(reflect.TypeOf(foo{}), "FieldInts", func(parent Coalescer) Coalescer {
+				return coalesceSliceAppend
+			}))
+			got, err := coalescer(reflect.ValueOf(foo{FieldInts: []int{1, 2}}), reflect.ValueOf(foo{FieldInts: []int{2, 3}}))
+			require.NoError(t, err)
+			assert.Equal(t, foo{FieldInts: []int{1, 2, 2, 3}}, got.Interface())
+		})
 		t.Run("atomic field", func(t *testing.T) {
 			type foo struct {
 				FieldInts map[int]string
@@ -296,6 +307,69 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 			)
 			require.NoError(t, err)
 			assert.Equal(t, foo{FieldInts: map[int]string{1: "def"}}, got.Interface())
+		})
+		t.Run("field set-union", func(t *testing.T) {
+			type foo struct {
+				FieldInts []int
+			}
+			coalescer := NewCoalescer(WithFieldSetUnion(reflect.TypeOf(foo{}), "FieldInts"))
+			got, err := coalescer(
+				reflect.ValueOf(foo{FieldInts: []int{1, 2}}),
+				reflect.ValueOf(foo{FieldInts: []int{2, 3}}),
+			)
+			require.NoError(t, err)
+			assert.Equal(t, foo{FieldInts: []int{1, 2, 3}}, got.Interface())
+		})
+		t.Run("field list-append", func(t *testing.T) {
+			type foo struct {
+				FieldInts []int
+			}
+			coalescer := NewCoalescer(WithFieldListAppend(reflect.TypeOf(foo{}), "FieldInts"))
+			got, err := coalescer(
+				reflect.ValueOf(foo{FieldInts: []int{1, 2}}),
+				reflect.ValueOf(foo{FieldInts: []int{2, 3}}),
+			)
+			require.NoError(t, err)
+			assert.Equal(t, foo{FieldInts: []int{1, 2, 2, 3}}, got.Interface())
+		})
+		t.Run("field merge-by-index", func(t *testing.T) {
+			type foo struct {
+				FieldInts []int
+			}
+			coalescer := NewCoalescer(WithFieldMergeByIndex(reflect.TypeOf(foo{}), "FieldInts"))
+			got, err := coalescer(
+				reflect.ValueOf(foo{FieldInts: []int{1, 2}}),
+				reflect.ValueOf(foo{FieldInts: []int{-1}}),
+			)
+			require.NoError(t, err)
+			assert.Equal(t, foo{FieldInts: []int{-1, 2}}, got.Interface())
+		})
+		t.Run("field merge-by-id", func(t *testing.T) {
+			type bar struct {
+				Name string
+			}
+			type foo struct {
+				FieldBars []bar
+			}
+			coalescer := NewCoalescer(WithFieldMergeByID(reflect.TypeOf(foo{}), "FieldBars", "Name"))
+			got, err := coalescer(
+				reflect.ValueOf(foo{FieldBars: []bar{{"a"}, {"b"}}}),
+				reflect.ValueOf(foo{FieldBars: []bar{{"b"}, {"a"}}}),
+			)
+			require.NoError(t, err)
+			assert.Equal(t, foo{FieldBars: []bar{{"a"}, {"b"}}}, got.Interface())
+		})
+		t.Run("field merge-by-key-func", func(t *testing.T) {
+			type foo struct {
+				FieldInts []int
+			}
+			coalescer := NewCoalescer(WithFieldMergeByKeyFunc(reflect.TypeOf(foo{}), "FieldInts", SliceUnion))
+			got, err := coalescer(
+				reflect.ValueOf(foo{FieldInts: []int{1, 2}}),
+				reflect.ValueOf(foo{FieldInts: []int{2, 3}}),
+			)
+			require.NoError(t, err)
+			assert.Equal(t, foo{FieldInts: []int{1, 2, 3}}, got.Interface())
 		})
 	})
 	t.Run("tag errors", func(t *testing.T) {

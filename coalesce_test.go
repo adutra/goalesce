@@ -229,7 +229,7 @@ func TestCoalesce(t *testing.T) {
 			"[]foo custom",
 			[]foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
 			[]foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-			[]CoalescerOption{WithMergeByField(reflect.TypeOf([]foo{}), "FieldInt")},
+			[]CoalescerOption{WithMergeByID(reflect.TypeOf([]foo{}), "FieldInt")},
 			[]foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 		},
 		{
@@ -237,7 +237,7 @@ func TestCoalesce(t *testing.T) {
 			[]*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
 			[]*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 			[]CoalescerOption{
-				WithMergeByKey(
+				WithMergeByKeyFunc(
 					reflect.TypeOf([]*foo{}),
 					func(_ int, v reflect.Value) reflect.Value {
 						i := v.Interface()
@@ -251,7 +251,7 @@ func TestCoalesce(t *testing.T) {
 			[]*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
 			[]*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 			[]CoalescerOption{
-				WithMergeByField(reflect.TypeOf([]*foo{}), "FieldInt"),
+				WithMergeByID(reflect.TypeOf([]*foo{}), "FieldInt"),
 				WithTypeCoalescer(reflect.TypeOf([]*foo{}), coalesceAtomic)}, // will prevail
 			[]*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 		},

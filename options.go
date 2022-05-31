@@ -105,7 +105,7 @@ func WithDefaultMergeByIndex() CoalescerOption {
 // strategy dereferences the pointers and compare their targets. This strategy is fine for slices of scalars and
 // pointers thereof, but it is not recommended for slices of complex types as the elements may not be fully comparable.
 func WithSetUnion(sliceType reflect.Type) CoalescerOption {
-	return WithMergeByKey(sliceType, SliceUnion)
+	return WithMergeByKeyFunc(sliceType, SliceUnion)
 }
 
 // WithListAppend applies list-append semantics to the given slice type.
@@ -118,15 +118,15 @@ func WithListAppend(sliceType reflect.Type) CoalescerOption {
 	}
 }
 
-// WithMergeByKey applies merge-by-key semantics to the given slice type. The given mergeKeyFunc will be used to extract
-// the element merge key.
-func WithMergeByKey(sliceType reflect.Type, f SliceMergeKeyFunc) CoalescerOption {
+// WithMergeByKeyFunc applies merge-by-key semantics to the given slice type. The given SliceMergeKeyFunc will be used to
+// extract the element merge key.
+func WithMergeByKeyFunc(sliceType reflect.Type, mergeKeyFunc SliceMergeKeyFunc) CoalescerOption {
 	return func(c *mainCoalescer) {
 		if c.sliceCoalescers == nil {
 			c.sliceCoalescers = make(map[reflect.Type]Coalescer)
 		}
 		c.sliceCoalescers[sliceType] = func(v1, v2 reflect.Value) (reflect.Value, error) {
-			return c.coalesceSliceMerge(v1, v2, f)
+			return c.coalesceSliceMerge(v1, v2, mergeKeyFunc)
 		}
 	}
 }
@@ -134,7 +134,7 @@ func WithMergeByKey(sliceType reflect.Type, f SliceMergeKeyFunc) CoalescerOption
 // WithMergeByIndex applies merge-by-index semantics to the given slice type. The given mergeKeyFunc will be used to
 // extract the element merge key.
 func WithMergeByIndex(sliceType reflect.Type) CoalescerOption {
-	return WithMergeByKey(sliceType, SliceIndex)
+	return WithMergeByKeyFunc(sliceType, SliceIndex)
 }
 
 // WithZeroEmptySlice instructs the coalescer to consider empty slices as zero (nil) slices. This changes the default
@@ -146,12 +146,12 @@ func WithZeroEmptySlice() CoalescerOption {
 	}
 }
 
-// WithMergeByField applies merge-by-key semantics to slices whose elements are of some struct type, or a pointer
+// WithMergeByID applies merge-by-key semantics to slices whose elements are of some struct type, or a pointer
 // thereto. The passed field name will be used to extract the element's merge key; therefore, the field should generally
 // be a unique identifier or primary key for objects of this type.
-func WithMergeByField(sliceOfStructType reflect.Type, field string) CoalescerOption {
+func WithMergeByID(sliceOfStructType reflect.Type, elemField string) CoalescerOption {
 	return func(c *mainCoalescer) {
-		WithMergeByKey(sliceOfStructType, newMergeByField(field))(c)
+		WithMergeByKeyFunc(sliceOfStructType, newMergeByField(elemField))(c)
 	}
 }
 
@@ -178,8 +178,72 @@ func WithFieldCoalescerProvider(structType reflect.Type, field string, provider 
 	}
 }
 
+// WithFieldListAppend coalesces the given struct field with list-append semantics. The field must be of slice type.
+// This is the programmatic equivalent of adding a `goalesce:append` struct tag to that field.
+func WithFieldListAppend(structType reflect.Type, field string) CoalescerOption {
+	return func(c *mainCoalescer) {
+		if c.fieldCoalescers == nil {
+			c.fieldCoalescers = make(map[reflect.Type]map[string]Coalescer)
+		}
+		if c.fieldCoalescers[structType] == nil {
+			c.fieldCoalescers[structType] = make(map[string]Coalescer)
+		}
+		c.fieldCoalescers[structType][field] = coalesceSliceAppend
+	}
+}
+
+// WithFieldSetUnion coalesces the given struct field with set-union semantics. The field must be of slice type. This is
+// the programmatic equivalent of adding a `goalesce:union` struct tag to that field.
+func WithFieldSetUnion(structType reflect.Type, field string) CoalescerOption {
+	return WithFieldMergeByKeyFunc(structType, field, SliceUnion)
+}
+
+// WithFieldMergeByIndex coalesces the given struct field with merge-by-index semantics. The field must be of slice
+// type. This is the programmatic equivalent of adding a `goalesce:index` struct tag to that field.
+func WithFieldMergeByIndex(structType reflect.Type, field string) CoalescerOption {
+	return WithFieldMergeByKeyFunc(structType, field, SliceIndex)
+}
+
+// WithFieldMergeByID coalesces the given struct field with merge-by-key semantics. The field must be of slice type.
+// The slice element type must be of some other struct type, or a pointer thereto. The passed key must be a valid field
+// name for that struct type and will be used to extract the slice element's merge key; therefore, that field should
+// generally be a unique identifier or primary key for objects of this type. This is the programmatic equivalent of
+// adding a `goalesce:merge,key` struct tag to the struct field.
+func WithFieldMergeByID(structType reflect.Type, field string, key string) CoalescerOption {
+	return func(c *mainCoalescer) {
+		if c.fieldCoalescers == nil {
+			c.fieldCoalescers = make(map[reflect.Type]map[string]Coalescer)
+		}
+		if c.fieldCoalescers[structType] == nil {
+			c.fieldCoalescers[structType] = make(map[string]Coalescer)
+		}
+		c.fieldCoalescers[structType][field] = func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return c.coalesceSliceMerge(v1, v2, newMergeByField(key))
+		}
+	}
+}
+
+// WithFieldMergeByKeyFunc coalesces the given struct field with merge-by-key semantics. The field must be of slice
+// type. The slice element type must be of some other struct type, or a pointer thereto. The given SliceMergeKeyFunc
+// will be used to extract the slice element's merge key; therefore, the field should generally be a unique identifier
+// or primary key for objects of this type.
+func WithFieldMergeByKeyFunc(structType reflect.Type, field string, mergeKeyFunc SliceMergeKeyFunc) CoalescerOption {
+	return func(c *mainCoalescer) {
+		if c.fieldCoalescers == nil {
+			c.fieldCoalescers = make(map[reflect.Type]map[string]Coalescer)
+		}
+		if c.fieldCoalescers[structType] == nil {
+			c.fieldCoalescers[structType] = make(map[string]Coalescer)
+		}
+		c.fieldCoalescers[structType][field] = func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return c.coalesceSliceMerge(v1, v2, mergeKeyFunc)
+		}
+	}
+}
+
 // WithAtomicField causes the given field to be coalesced atomically, that is, with  "atomic" semantics, instead of its
 // default coalesce semantics. When 2 non-zero-values of this field are coalesced, the second value is returned as is.
+// This is the programmatic equivalent of adding a `goalesce:atomic` struct tag to that field.
 func WithAtomicField(structType reflect.Type, field string) CoalescerOption {
 	return WithFieldCoalescer(structType, field, coalesceAtomic)
 }

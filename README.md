@@ -400,6 +400,15 @@ Output:
 }
 ```
 
+If you cannot annotate your struct with a `goalesce` tag, you can use the following options to specify per-field 
+strategies programmatically:
+
+* `WithFieldListAppend`
+* `WithFieldListUnion`
+* `WithFieldMergeByIndex`
+* `WithFieldMergeByID`
+* `WithFieldMergeByKeyFunc`
+
 See the [online documentation](https://pkg.go.dev/github.com/adutra/goalesce?tab=doc) for more examples.
 
 ## Advanced usage

@@ -508,32 +508,50 @@ func Test_newMergeByField(t *testing.T) {
 	u := User{ID: 1, Name: stringPtr("Alice")}
 	t.Run("on struct", func(t *testing.T) {
 		mergeKeyFunc := newMergeByField("ID")
-		mergeKey := mergeKeyFunc(-1, reflect.ValueOf(u))
+		mergeKey, err := mergeKeyFunc(-1, reflect.ValueOf(u))
 		assert.Equal(t, 1, mergeKey.Interface())
+		assert.NoError(t, err)
 	})
 	t.Run("on pointer to struct", func(t *testing.T) {
 		mergeKeyFunc := newMergeByField("ID")
-		mergeKey := mergeKeyFunc(-1, reflect.ValueOf(&u))
+		mergeKey, err := mergeKeyFunc(-1, reflect.ValueOf(u))
 		assert.Equal(t, 1, mergeKey.Interface())
+		assert.NoError(t, err)
 	})
 	t.Run("on pointer field", func(t *testing.T) {
 		mergeKeyFunc := newMergeByField("Name")
-		mergeKey := mergeKeyFunc(-1, reflect.ValueOf(u))
+		mergeKey, err := mergeKeyFunc(-1, reflect.ValueOf(u))
 		assert.Equal(t, "Alice", mergeKey.String())
+		assert.NoError(t, err)
 	})
 	t.Run("on pointer to struct and pointer field", func(t *testing.T) {
 		mergeKeyFunc := newMergeByField("Name")
-		mergeKey := mergeKeyFunc(-1, reflect.ValueOf(&u))
+		mergeKey, err := mergeKeyFunc(-1, reflect.ValueOf(u))
 		assert.Equal(t, "Alice", mergeKey.String())
+		assert.NoError(t, err)
+	})
+	t.Run("not a struct", func(t *testing.T) {
+		mergeKeyFunc := newMergeByField("Name")
+		mergeKey, err := mergeKeyFunc(-1, reflect.ValueOf(123))
+		assert.False(t, mergeKey.IsValid())
+		assert.ErrorContains(t, err, "expecting struct or pointer thereto, got: int")
+	})
+	t.Run("not a struct, pointer", func(t *testing.T) {
+		mergeKeyFunc := newMergeByField("Name")
+		mergeKey, err := mergeKeyFunc(-1, reflect.ValueOf(intPtr(123)))
+		assert.False(t, mergeKey.IsValid())
+		assert.ErrorContains(t, err, "expecting struct or pointer thereto, got: *int")
 	})
 	t.Run("invalid field", func(t *testing.T) {
-		assert.Panics(t, func() {
-			mergeKeyFunc := newMergeByField("NonExistent")
-			mergeKeyFunc(-1, reflect.ValueOf(u))
-		})
-		assert.Panics(t, func() {
-			mergeKeyFunc := newMergeByField("NonExistent")
-			mergeKeyFunc(-1, reflect.ValueOf(&u))
-		})
+		mergeKeyFunc := newMergeByField("NonExistent")
+		mergeKey, err := mergeKeyFunc(-1, reflect.ValueOf(u))
+		assert.False(t, mergeKey.IsValid())
+		assert.ErrorContains(t, err, "struct type goalesce.User has no field named NonExistent")
+	})
+	t.Run("invalid field on pointer to struct", func(t *testing.T) {
+		mergeKeyFunc := newMergeByField("NonExistent")
+		mergeKey, err := mergeKeyFunc(-1, reflect.ValueOf(&u))
+		assert.False(t, mergeKey.IsValid())
+		assert.ErrorContains(t, err, "struct type goalesce.User has no field named NonExistent")
 	})
 }

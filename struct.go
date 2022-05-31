@@ -140,12 +140,19 @@ func (c *mainCoalescer) mergeFieldCoalescer(structType reflect.Type, field refle
 // This function is designed to work on slices of structs, and slices of pointers to structs. When this function
 // encounters a pointer while extracting the merge key, it dereferences the pointer; if the pointer was nil, a zero
 // value will be used instead, but beware that this may result in nondeterministic merge results.
-func newMergeByField(field string) SliceMergeKeyFunc {
-	return func(_ int, elem reflect.Value) reflect.Value {
+func newMergeByField(key string) SliceMergeKeyFunc {
+	return func(_ int, elem reflect.Value) (reflect.Value, error) {
 		// the slice element itself may be a pointer; we want to dereference it and return a zero-value if it's nil.
-		elem = safeIndirect(elem)
+		deref := safeIndirect(elem)
+		if deref.Type().Kind() != reflect.Struct {
+			return reflect.Value{}, fmt.Errorf("expecting struct or pointer thereto, got: %s", elem.Type().String())
+		}
+		field := deref.FieldByName(key)
+		if !field.IsValid() {
+			return reflect.Value{}, fmt.Errorf("struct type %s has no field named %s", deref.Type().String(), key)
+		}
 		// the slice element's field may also be a pointer; again, we want to dereference it and return a zero-value
 		// if it's nil.
-		return safeIndirect(elem.FieldByName(field))
+		return safeIndirect(field), nil
 	}
 }

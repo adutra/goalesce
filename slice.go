@@ -137,7 +137,13 @@ func (c *coalescer) deepSliceMerge(v1, v2 reflect.Value, mergeKeyFunc SliceMerge
 	// Note: we can't call deepMergeMap here because it is important to NOT copy the merge keys
 	m := reflect.MakeMap(m1.Type())
 	for _, k := range m1.MapKeys() {
-		m.SetMapIndex(k, m1.MapIndex(k))
+		if !m2.MapIndex(k).IsValid() {
+			copiedValue, err := c.deepCopy(m1.MapIndex(k))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			m.SetMapIndex(k, copiedValue)
+		}
 	}
 	for _, k := range m2.MapKeys() {
 		if m1.MapIndex(k).IsValid() {

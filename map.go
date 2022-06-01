@@ -20,6 +20,19 @@ import (
 
 func (c *coalescer) deepMergeMap(v1, v2 reflect.Value) (reflect.Value, error) {
 	coalesced := reflect.MakeMap(v1.Type())
+	for _, k := range v1.MapKeys() {
+		if !v2.MapIndex(k).IsValid() {
+			copiedKey, err := c.deepCopy(k)
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			copiedValue, err := c.deepCopy(v1.MapIndex(k))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			coalesced.SetMapIndex(copiedKey, copiedValue)
+		}
+	}
 	for _, k := range v2.MapKeys() {
 		copiedKey, err := c.deepCopy(k)
 		if err != nil {
@@ -33,19 +46,6 @@ func (c *coalescer) deepMergeMap(v1, v2 reflect.Value) (reflect.Value, error) {
 			coalesced.SetMapIndex(copiedKey, coalescedValue)
 		} else {
 			copiedValue, err := c.deepCopy(v2.MapIndex(k))
-			if err != nil {
-				return reflect.Value{}, err
-			}
-			coalesced.SetMapIndex(copiedKey, copiedValue)
-		}
-	}
-	for _, k := range v1.MapKeys() {
-		if !v2.MapIndex(k).IsValid() {
-			copiedKey, err := c.deepCopy(k)
-			if err != nil {
-				return reflect.Value{}, err
-			}
-			copiedValue, err := c.deepCopy(v1.MapIndex(k))
 			if err != nil {
 				return reflect.Value{}, err
 			}

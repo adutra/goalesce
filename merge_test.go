@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCoalesce(t *testing.T) {
+func TestDeepMerge(t *testing.T) {
 	type foo struct {
 		FieldInt int
 	}
@@ -33,7 +33,7 @@ func TestCoalesce(t *testing.T) {
 		name string
 		v1   interface{}
 		v2   interface{}
-		opts []CoalescerOption
+		opts []DeepMergeOption
 		want interface{}
 	}{
 		{
@@ -166,7 +166,7 @@ func TestCoalesce(t *testing.T) {
 			"struct non zero custom coalescer",
 			bar{FieldInt: 0, FieldFoo: foo{FieldInt: 1}},
 			bar{FieldInt: 1},
-			[]CoalescerOption{WithAtomicType(reflect.TypeOf(bar{}))},
+			[]DeepMergeOption{WithAtomicType(reflect.TypeOf(bar{}))},
 			bar{FieldInt: 1},
 		},
 		{
@@ -187,7 +187,7 @@ func TestCoalesce(t *testing.T) {
 			"map[int]foo custom coalescer",
 			map[int]foo{1: {FieldInt: 1}, 3: {FieldInt: 3}},
 			map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}},
-			[]CoalescerOption{WithAtomicType(reflect.TypeOf(map[int]foo{}))},
+			[]DeepMergeOption{WithAtomicType(reflect.TypeOf(map[int]foo{}))},
 			map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}},
 		},
 		{
@@ -215,28 +215,28 @@ func TestCoalesce(t *testing.T) {
 			"[]int union",
 			[]int{1, 3},
 			[]int{1, 2},
-			[]CoalescerOption{WithDefaultSetUnion()},
+			[]DeepMergeOption{WithDefaultSetUnion()},
 			[]int{1, 3, 2},
 		},
 		{
 			"[]int append",
 			[]int{1, 3},
 			[]int{1, 2},
-			[]CoalescerOption{WithDefaultListAppend()},
+			[]DeepMergeOption{WithDefaultListAppend()},
 			[]int{1, 3, 1, 2},
 		},
 		{
 			"[]foo custom",
 			[]foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
 			[]foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-			[]CoalescerOption{WithMergeByID(reflect.TypeOf([]foo{}), "FieldInt")},
+			[]DeepMergeOption{WithMergeByID(reflect.TypeOf([]foo{}), "FieldInt")},
 			[]foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 		},
 		{
 			"[]*int custom",
 			[]*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
 			[]*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-			[]CoalescerOption{
+			[]DeepMergeOption{
 				WithMergeByKeyFunc(
 					reflect.TypeOf([]*foo{}),
 					func(_ int, v reflect.Value) (reflect.Value, error) {
@@ -250,49 +250,49 @@ func TestCoalesce(t *testing.T) {
 			"[]*int type coalescer",
 			[]*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
 			[]*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-			[]CoalescerOption{
+			[]DeepMergeOption{
 				WithMergeByID(reflect.TypeOf([]*foo{}), "FieldInt"),
-				WithTypeCoalescer(reflect.TypeOf([]*foo{}), coalesceAtomic)}, // will prevail
-			[]*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
+				WithListAppend(reflect.TypeOf([]*foo{}))}, // will prevail
+			[]*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 		},
-		{"trilean nil nil", (*bool)(nil), (*bool)(nil), []CoalescerOption{WithTrileans()}, (*bool)(nil)},
-		{"trilean nil false", (*bool)(nil), boolPtr(false), []CoalescerOption{WithTrileans()}, boolPtr(false)},
-		{"trilean nil true", (*bool)(nil), boolPtr(true), []CoalescerOption{WithTrileans()}, boolPtr(true)},
-		{"trilean false nil", boolPtr(false), (*bool)(nil), []CoalescerOption{WithTrileans()}, boolPtr(false)},
-		{"trilean false false", boolPtr(false), boolPtr(false), []CoalescerOption{WithTrileans()}, boolPtr(false)},
-		{"trilean false true", boolPtr(false), boolPtr(true), []CoalescerOption{WithTrileans()}, boolPtr(true)},
-		{"trilean true nil", boolPtr(true), (*bool)(nil), []CoalescerOption{WithTrileans()}, boolPtr(true)},
-		// with trileans: coalesce(true, false) = false
-		{"trilean true false", boolPtr(true), boolPtr(false), []CoalescerOption{WithTrileans()}, boolPtr(false)},
-		// without trileans: coalesce(true, false) = true
+		{"trilean nil nil", (*bool)(nil), (*bool)(nil), []DeepMergeOption{WithTrileans()}, (*bool)(nil)},
+		{"trilean nil false", (*bool)(nil), boolPtr(false), []DeepMergeOption{WithTrileans()}, boolPtr(false)},
+		{"trilean nil true", (*bool)(nil), boolPtr(true), []DeepMergeOption{WithTrileans()}, boolPtr(true)},
+		{"trilean false nil", boolPtr(false), (*bool)(nil), []DeepMergeOption{WithTrileans()}, boolPtr(false)},
+		{"trilean false false", boolPtr(false), boolPtr(false), []DeepMergeOption{WithTrileans()}, boolPtr(false)},
+		{"trilean false true", boolPtr(false), boolPtr(true), []DeepMergeOption{WithTrileans()}, boolPtr(true)},
+		{"trilean true nil", boolPtr(true), (*bool)(nil), []DeepMergeOption{WithTrileans()}, boolPtr(true)},
+		// with trileans: deepMerge(true, false) = false
+		{"trilean true false", boolPtr(true), boolPtr(false), []DeepMergeOption{WithTrileans()}, boolPtr(false)},
+		// without trileans: deepMerge(true, false) = true
 		{"trilean true false", boolPtr(true), boolPtr(false), nil, boolPtr(true)},
-		{"trilean true true", boolPtr(true), boolPtr(true), []CoalescerOption{WithTrileans()}, boolPtr(true)},
-		{"type coalescer zero values", "", "", []CoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer)}, "ZERO!ZERO!"},
-		{"type coalescer zero value 1", "abc", "", []CoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer)}, "abcZERO!"},
-		{"type coalescer zero value 2", "", "def", []CoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer)}, "ZERO!def"},
-		{"type coalescer non-zero values", "abc", "def", []CoalescerOption{WithTypeCoalescer(reflect.TypeOf(""), weirdStringCoalescer)}, "abcdef"},
+		{"trilean true true", boolPtr(true), boolPtr(true), []DeepMergeOption{WithTrileans()}, boolPtr(true)},
+		{"type coalescer zero values", "", "", []DeepMergeOption{WithTypeMerger(reflect.TypeOf(""), weirdStringDeepMerge)}, "ZERO!ZERO!"},
+		{"type coalescer zero value 1", "abc", "", []DeepMergeOption{WithTypeMerger(reflect.TypeOf(""), weirdStringDeepMerge)}, "abcZERO!"},
+		{"type coalescer zero value 2", "", "def", []DeepMergeOption{WithTypeMerger(reflect.TypeOf(""), weirdStringDeepMerge)}, "ZERO!def"},
+		{"type coalescer non-zero values", "abc", "def", []DeepMergeOption{WithTypeMerger(reflect.TypeOf(""), weirdStringDeepMerge)}, "abcdef"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Coalesce(tt.v1, tt.v2, tt.opts...)
+			got, err := DeepMerge(tt.v1, tt.v2, tt.opts...)
 			assert.Equal(t, tt.want, got)
 			assert.NoError(t, err)
 		})
 	}
 	t.Run("errors", func(t *testing.T) {
-		_, err := Coalesce(1, "a")
+		_, err := DeepMerge(1, "a")
 		assert.EqualError(t, err, "types do not match: int != string")
 	})
 }
 
-func TestMustCoalesce(t *testing.T) {
-	assert.Equal(t, "def", MustCoalesce("abc", "def"))
+func TestMustDeepMerge(t *testing.T) {
+	assert.Equal(t, "def", MustDeepMerge("abc", "def"))
 	assert.PanicsWithError(t, "types do not match: int != string", func() {
-		MustCoalesce(1, " abc")
+		MustDeepMerge(1, " abc")
 	})
 }
 
-func weirdStringCoalescer(v1, v2 reflect.Value) (reflect.Value, error) {
+func weirdStringDeepMerge(v1, v2 reflect.Value) (reflect.Value, error) {
 	if v1.IsZero() {
 		v1 = reflect.ValueOf("ZERO!")
 	}

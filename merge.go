@@ -18,7 +18,7 @@ import (
 	"reflect"
 )
 
-// Coalesce merges the 2 values into a single value.
+// DeepMerge merges the 2 values into a single value.
 //
 // When called with no options, the function uses the following default algorithm:
 //
@@ -26,42 +26,42 @@ import (
 //  - If one value is nil, return the other value.
 //  - If both values are zero-values for the type, return the type's zero-value.
 //  - If one value is a zero-value for the type, return the other value.
-//  - Otherwise, the values are coalesced using the following rules:
-//    - If both values are interfaces of same underlying types, coalesce the underlying values.
-//    - If both values are pointers, coalesce the values pointed to.
-//    - If both values are maps, coalesce the maps recursively, key by key.
-//    - If both values are structs, coalesce the structs recursively, field by field.
+//  - Otherwise, the values are merged using the following rules:
+//    - If both values are interfaces of same underlying types, merge the underlying values.
+//    - If both values are pointers, merge the values pointed to.
+//    - If both values are maps, merge the maps recursively, key by key.
+//    - If both values are structs, merge the structs recursively, field by field.
 //    - For other types (including slices), return the second value ("atomic" semantics)
 //
-// The function never modifies its inputs. It may return one of the (unmodified) inputs as the coalesced value, but
-// whenever changes to the inputs are required, the function always returns an entirely newly-allocated value.
+// The function never modifies its inputs. It always returns an entirely newly-allocated value that shares no references
+// with the inputs.
 //
-// Note that by default, slices are coalesced with atomic semantics, that is, the second slice overwrites the first one
+// Note that by default, slices are merged with atomic semantics, that is, the second slice overwrites the first one
 // completely. It is possible to change this behavior and use list-append, set-union, or merge-by semantics.
-// See SliceCoalescerOption.
+// See DeepMergeOption.
 //
-// The function returns an error if the values are not of the same type.
-func Coalesce(o1, o2 interface{}, opts ...CoalescerOption) (coalesced interface{}, err error) {
+// The function returns an error if the values are not of the same type, or if the merge encounters an error.
+func DeepMerge(o1, o2 interface{}, opts ...DeepMergeOption) (coalesced interface{}, err error) {
 	if o1 == nil {
 		return o2, nil
 	} else if o2 == nil {
 		return o1, nil
 	}
-	coalescer := NewCoalescer(opts...)
+	deepMerge := NewDeepMergeFunc(opts...)
 	v1 := reflect.ValueOf(o1)
 	v2 := reflect.ValueOf(o2)
-	result, err := coalescer(v1, v2)
+	result, err := deepMerge(v1, v2)
 	if err != nil {
 		return nil, err
 	}
 	return result.Interface(), nil
 }
 
-// MustCoalesce is like Coalesce, but panics if the coalescing returns an error.
-func MustCoalesce(o1, o2 interface{}, opts ...CoalescerOption) interface{} {
-	coalesced, err := Coalesce(o1, o2, opts...)
+// MustDeepMerge is like DeepMerge, but panics if the merge returns an error.
+func MustDeepMerge(o1, o2 interface{}, opts ...DeepMergeOption) interface{} {
+	merged, err := DeepMerge(o1, o2, opts...)
 	if err != nil {
 		panic(err)
 	}
-	return coalesced
+	return merged
 }

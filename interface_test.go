@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_mainCoalescer_coalesceInterface(t *testing.T) {
+func Test_coalescer_deepMergeInterface(t *testing.T) {
 	type foo struct {
 		FieldInt int
 	}
@@ -120,19 +120,19 @@ func Test_mainCoalescer_coalesceInterface(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			coalescer := NewCoalescer()
-			got, err := coalescer(reflect.ValueOf(&tt.v1).Elem(), reflect.ValueOf(&tt.v2).Elem())
+			deepMerge := NewDeepMergeFunc()
+			got, err := deepMerge(reflect.ValueOf(&tt.v1).Elem(), reflect.ValueOf(&tt.v2).Elem())
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got.Interface())
 		})
 	}
 	t.Run("fallback error", func(t *testing.T) {
-		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
+		deepMerge := NewDeepMergeFunc(WithTypeMerger(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
 			return reflect.Value{}, errors.New("fake")
 		}))
 		var v1 interface{} = 1
 		var v2 interface{} = 2
-		_, err := coalescer(reflect.ValueOf(&v1).Elem(), reflect.ValueOf(&v2).Elem())
+		_, err := deepMerge(reflect.ValueOf(&v1).Elem(), reflect.ValueOf(&v2).Elem())
 		assert.EqualError(t, err, "fake")
 	})
 }

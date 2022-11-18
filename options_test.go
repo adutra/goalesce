@@ -22,12 +22,12 @@ import (
 )
 
 func TestWithTypeCopier(t *testing.T) {
-	c := newCoalescer()
 	called := false
-	WithTypeCopier(reflect.TypeOf(map[string]int{}), func(v reflect.Value) (reflect.Value, error) {
-		called = true
-		return v, nil
-	})(c)
+	c := newCoalescer(
+		WithTypeCopier(reflect.TypeOf(map[string]int{}), func(v reflect.Value) (reflect.Value, error) {
+			called = true
+			return v, nil
+		}))
 	assert.NotNil(t, c.typeCopiers[reflect.TypeOf(map[string]int{})])
 	got, err := c.deepCopy(reflect.ValueOf(map[string]int{"a": 1}))
 	assert.Equal(t, map[string]int{"a": 1}, got.Interface())
@@ -36,8 +36,7 @@ func TestWithTypeCopier(t *testing.T) {
 }
 
 func TestWithAtomicMerge(t *testing.T) {
-	c := newCoalescer()
-	WithAtomicMerge(reflect.TypeOf(map[string]int{}))(c)
+	c := newCoalescer(WithAtomicMerge(reflect.TypeOf(map[string]int{})))
 	assert.NotNil(t, c.typeMergers[reflect.TypeOf(map[string]int{})])
 	got, err := c.deepMerge(reflect.ValueOf(map[string]int{"a": 1}), reflect.ValueOf(map[string]int{"b": 2}))
 	assert.Equal(t, map[string]int{"b": 2}, got.Interface())
@@ -45,8 +44,7 @@ func TestWithAtomicMerge(t *testing.T) {
 }
 
 func TestWithTrileanMerge(t *testing.T) {
-	c := newCoalescer()
-	WithTrileanMerge()(c)
+	c := newCoalescer(WithTrileanMerge())
 	assert.NotNil(t, c.typeMergers[reflect.PtrTo(reflect.TypeOf(false))])
 	got, err := c.deepMerge(reflect.ValueOf(boolPtr(true)), reflect.ValueOf(boolPtr(false)))
 	assert.Equal(t, boolPtr(false), got.Interface())
@@ -54,12 +52,12 @@ func TestWithTrileanMerge(t *testing.T) {
 }
 
 func TestWithTypeMerger(t *testing.T) {
-	c := newCoalescer()
 	called := false
-	WithTypeMerger(reflect.TypeOf(map[string]int{}), func(v1, v2 reflect.Value) (reflect.Value, error) {
-		called = true
-		return c.deepMergeAtomic(v1, v2)
-	})(c)
+	c := newCoalescer(
+		WithTypeMerger(reflect.TypeOf(map[string]int{}), func(v1, v2 reflect.Value) (reflect.Value, error) {
+			called = true
+			return v2, nil
+		}))
 	assert.NotNil(t, c.typeMergers[reflect.TypeOf(map[string]int{})])
 	got, err := c.deepMerge(reflect.ValueOf(map[string]int{"a": 1}), reflect.ValueOf(map[string]int{"b": 2}))
 	assert.Equal(t, map[string]int{"b": 2}, got.Interface())
@@ -68,15 +66,15 @@ func TestWithTypeMerger(t *testing.T) {
 }
 
 func TestWithTypeMergerProvider(t *testing.T) {
-	c := newCoalescer()
 	called := 0
-	WithTypeMergerProvider(reflect.TypeOf(map[string]int{}), func(parent DeepMergeFunc) DeepMergeFunc {
-		called++
-		return func(v1, v2 reflect.Value) (reflect.Value, error) {
+	c := newCoalescer(
+		WithTypeMergerProvider(reflect.TypeOf(map[string]int{}), func(parent DeepMergeFunc) DeepMergeFunc {
 			called++
-			return c.deepMergeAtomic(v1, v2)
-		}
-	})(c)
+			return func(v1, v2 reflect.Value) (reflect.Value, error) {
+				called++
+				return v2, nil
+			}
+		}))
 	assert.NotNil(t, c.typeMergers[reflect.TypeOf(map[string]int{})])
 	got, err := c.deepMerge(reflect.ValueOf(map[string]int{"a": 1}), reflect.ValueOf(map[string]int{"b": 2}))
 	assert.Equal(t, map[string]int{"b": 2}, got.Interface())
@@ -88,12 +86,12 @@ func TestWithFieldMerger(t *testing.T) {
 	type User struct {
 		ID string
 	}
-	c := newCoalescer()
 	called := false
-	WithFieldMerger(reflect.TypeOf(User{}), "ID", func(v1, v2 reflect.Value) (reflect.Value, error) {
-		called = true
-		return c.deepMergeAtomic(v1, v2)
-	})(c)
+	c := newCoalescer(
+		WithFieldMerger(reflect.TypeOf(User{}), "ID", func(v1, v2 reflect.Value) (reflect.Value, error) {
+			called = true
+			return v2, nil
+		}))
 	assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["ID"])
 	got, err := c.deepMerge(reflect.ValueOf(User{"Alice"}), reflect.ValueOf(User{"Bob"}))
 	assert.Equal(t, User{"Bob"}, got.Interface())
@@ -105,15 +103,15 @@ func TestWithFieldMergerProvider(t *testing.T) {
 	type User struct {
 		ID string
 	}
-	c := newCoalescer()
 	called := 0
-	WithFieldMergerProvider(reflect.TypeOf(User{}), "ID", func(parent DeepMergeFunc) DeepMergeFunc {
-		called++
-		return func(v1, v2 reflect.Value) (reflect.Value, error) {
+	c := newCoalescer(
+		WithFieldMergerProvider(reflect.TypeOf(User{}), "ID", func(parent DeepMergeFunc) DeepMergeFunc {
 			called++
-			return c.deepMergeAtomic(v1, v2)
-		}
-	})(c)
+			return func(v1, v2 reflect.Value) (reflect.Value, error) {
+				called++
+				return v2, nil
+			}
+		}))
 	assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["ID"])
 	got, err := c.deepMerge(reflect.ValueOf(User{"Alice"}), reflect.ValueOf(User{"Bob"}))
 	assert.Equal(t, User{"Bob"}, got.Interface())
@@ -125,35 +123,39 @@ func TestWithAtomicFieldMerge(t *testing.T) {
 	type User struct {
 		ID string
 	}
-	c := newCoalescer()
-	WithAtomicFieldMerge(reflect.TypeOf(User{}), "ID")(c)
+	c := newCoalescer(WithAtomicFieldMerge(reflect.TypeOf(User{}), "ID"))
 	assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["ID"])
 	got, err := c.deepMerge(reflect.ValueOf(User{"Alice"}), reflect.ValueOf(User{"Bob"}))
 	assert.Equal(t, User{"Bob"}, got.Interface())
 	assert.NoError(t, err)
 }
 
-func TestWithDefaultListAppendMerge(t *testing.T) {
-	c := newCoalescer()
-	WithDefaultSliceListAppendMerge()(c)
+func TestWithDefaultSliceListAppendMerge(t *testing.T) {
+	c := newCoalescer(WithDefaultSliceListAppendMerge())
 	assert.NotNil(t, c.sliceMerger)
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{2, 3}))
 	assert.Equal(t, []int{1, 2, 2, 3}, got.Interface())
 	assert.NoError(t, err)
 }
 
-func TestWithDefaultMergeByIndex(t *testing.T) {
-	c := newCoalescer()
-	WithDefaultSliceMergeByIndex()(c)
+func TestWithDefaultSliceMergeByIndex(t *testing.T) {
+	c := newCoalescer(WithDefaultSliceMergeByIndex())
 	assert.NotNil(t, c.sliceMerger)
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{-1}))
 	assert.Equal(t, []int{-1, 2}, got.Interface())
 	assert.NoError(t, err)
 }
 
-func TestWithDefaultSetUnionMerge(t *testing.T) {
-	c := newCoalescer()
-	WithDefaultSliceSetUnionMerge()(c)
+func TestWithDefaultArrayMergeByIndex(t *testing.T) {
+	c := newCoalescer(WithDefaultArrayMergeByIndex())
+	assert.NotNil(t, c.arrayMerger)
+	got, err := c.deepMerge(reflect.ValueOf([2]int{1, 2}), reflect.ValueOf([2]int{-1}))
+	assert.Equal(t, [2]int{-1, 2}, got.Interface())
+	assert.NoError(t, err)
+}
+
+func TestWithDefaultSliceSetUnionMerge(t *testing.T) {
+	c := newCoalescer(WithDefaultSliceSetUnionMerge())
 	assert.NotNil(t, c.sliceMerger)
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{2, 3}))
 	assert.Equal(t, []int{1, 2, 3}, got.Interface())
@@ -161,49 +163,52 @@ func TestWithDefaultSetUnionMerge(t *testing.T) {
 }
 
 func TestWithErrorOnCycle(t *testing.T) {
-	c := newCoalescer()
-	WithErrorOnCycle()(c)
+	c := newCoalescer(WithErrorOnCycle())
 	assert.Equal(t, true, c.errorOnCycle)
 }
 
-func TestWithListAppendMerge(t *testing.T) {
-	c := newCoalescer()
-	WithSliceListAppendMerge(reflect.TypeOf([]int{}))(c)
+func TestWithSliceListAppendMerge(t *testing.T) {
+	c := newCoalescer(WithSliceListAppendMerge(reflect.TypeOf([]int{})))
 	assert.NotNil(t, c.sliceMergers[reflect.TypeOf([]int{})])
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{2, 3}))
 	assert.Equal(t, []int{1, 2, 2, 3}, got.Interface())
 	assert.NoError(t, err)
 }
 
-func TestWithSetUnionMerge(t *testing.T) {
-	c := newCoalescer()
-	WithSliceSetUnionMerge(reflect.TypeOf([]int{}))(c)
+func TestWithSliceSetUnionMerge(t *testing.T) {
+	c := newCoalescer(WithSliceSetUnionMerge(reflect.TypeOf([]int{})))
 	assert.NotNil(t, c.sliceMergers[reflect.TypeOf([]int{})])
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{2, 3}))
 	assert.Equal(t, []int{1, 2, 3}, got.Interface())
 	assert.NoError(t, err)
 }
 
-func TestWithMergeByIndex(t *testing.T) {
-	c := newCoalescer()
-	WithSliceMergeByIndex(reflect.TypeOf([]int{}))(c)
+func TestWithSliceMergeByIndex(t *testing.T) {
+	c := newCoalescer(WithSliceMergeByIndex(reflect.TypeOf([]int{})))
 	assert.NotNil(t, c.sliceMergers[reflect.TypeOf([]int{})])
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{-1}))
 	assert.Equal(t, []int{-1, 2}, got.Interface())
 	assert.NoError(t, err)
 }
 
-func TestWithMergeByKey(t *testing.T) {
+func TestWithArrayMergeByIndex(t *testing.T) {
+	c := newCoalescer(WithArrayMergeByIndex(reflect.TypeOf([2]int{})))
+	assert.NotNil(t, c.arrayMergers[reflect.TypeOf([2]int{})])
+	got, err := c.deepMerge(reflect.ValueOf([2]int{1, 2}), reflect.ValueOf([2]int{-1}))
+	assert.Equal(t, [2]int{-1, 2}, got.Interface())
+	assert.NoError(t, err)
+}
+
+func TestWithSliceMergeByKeyFunc(t *testing.T) {
 	type User struct {
 		ID string
 	}
-	c := newCoalescer()
 	called := false
 	mergeKeyFunc := func(index int, element reflect.Value) (key reflect.Value, err error) {
 		called = true
 		return element.FieldByName("ID"), nil
 	}
-	WithSliceMergeByKeyFunc(reflect.TypeOf([]User{}), mergeKeyFunc)(c)
+	c := newCoalescer(WithSliceMergeByKeyFunc(reflect.TypeOf([]User{}), mergeKeyFunc))
 	assert.NotNil(t, c.sliceMergers[reflect.TypeOf([]User{})])
 	got, err := c.deepMerge(reflect.ValueOf([]User{{"Alice"}, {"Bob"}}), reflect.ValueOf([]User{{"Bob"}, {"Alice"}}))
 	assert.Equal(t, []User{{"Alice"}, {"Bob"}}, got.Interface())
@@ -211,12 +216,11 @@ func TestWithMergeByKey(t *testing.T) {
 	assert.True(t, called)
 }
 
-func TestWithMergeByField(t *testing.T) {
+func TestWithSliceMergeByID(t *testing.T) {
 	type User struct {
 		ID string
 	}
-	c := newCoalescer()
-	WithSliceMergeByID(reflect.TypeOf([]User{}), "ID")(c)
+	c := newCoalescer(WithSliceMergeByID(reflect.TypeOf([]User{}), "ID"))
 	assert.NotNil(t, c.sliceMergers[reflect.TypeOf([]User{})])
 	got, err := c.deepMerge(reflect.ValueOf([]User{{"Alice"}, {"Bob"}}), reflect.ValueOf([]User{{"Bob"}, {"Alice"}}))
 	assert.Equal(t, []User{{"Alice"}, {"Bob"}}, got.Interface())
@@ -224,8 +228,7 @@ func TestWithMergeByField(t *testing.T) {
 }
 
 func TestWithZeroEmptySliceMerge(t *testing.T) {
-	c := newCoalescer()
-	WithZeroEmptySliceMerge()(c)
+	c := newCoalescer(WithZeroEmptySliceMerge())
 	assert.Equal(t, true, c.zeroEmptySlice)
 }
 
@@ -233,8 +236,7 @@ func TestWithFieldListAppendMerge(t *testing.T) {
 	type User struct {
 		Tags []string
 	}
-	c := newCoalescer()
-	WithFieldListAppendMerge(reflect.TypeOf(User{}), "Tags")(c)
+	c := newCoalescer(WithFieldListAppendMerge(reflect.TypeOf(User{}), "Tags"))
 	assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["Tags"])
 	got, err := c.deepMerge(reflect.ValueOf(User{Tags: []string{"tag1", "tag2"}}), reflect.ValueOf(User{Tags: []string{"tag2", "tag3"}}))
 	assert.Equal(t, User{Tags: []string{"tag1", "tag2", "tag2", "tag3"}}, got.Interface())
@@ -245,8 +247,7 @@ func TestWithFieldSetUnionMerge(t *testing.T) {
 	type User struct {
 		Tags []string
 	}
-	c := newCoalescer()
-	WithFieldSetUnionMerge(reflect.TypeOf(User{}), "Tags")(c)
+	c := newCoalescer(WithFieldSetUnionMerge(reflect.TypeOf(User{}), "Tags"))
 	assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["Tags"])
 	got, err := c.deepMerge(reflect.ValueOf(User{Tags: []string{"tag1", "tag2"}}), reflect.ValueOf(User{Tags: []string{"tag2", "tag3"}}))
 	assert.Equal(t, User{Tags: []string{"tag1", "tag2", "tag3"}}, got.Interface())
@@ -257,8 +258,7 @@ func TestWithFieldMergeByIndex(t *testing.T) {
 	type User struct {
 		Tags []string
 	}
-	c := newCoalescer()
-	WithFieldMergeByIndex(reflect.TypeOf(User{}), "Tags")(c)
+	c := newCoalescer(WithFieldMergeByIndex(reflect.TypeOf(User{}), "Tags"))
 	assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["Tags"])
 	got, err := c.deepMerge(reflect.ValueOf(User{Tags: []string{"tag1", "tag2"}}), reflect.ValueOf(User{Tags: []string{"tag1a"}}))
 	assert.Equal(t, User{Tags: []string{"tag1a", "tag2"}}, got.Interface())
@@ -272,8 +272,7 @@ func TestWithFieldMergeByID(t *testing.T) {
 	type User struct {
 		Tags []Tag
 	}
-	c := newCoalescer()
-	WithFieldMergeByID(reflect.TypeOf(User{}), "Tags", "Name")(c)
+	c := newCoalescer(WithFieldMergeByID(reflect.TypeOf(User{}), "Tags", "Name"))
 	assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["Tags"])
 	got, err := c.deepMerge(reflect.ValueOf(User{Tags: []Tag{{"tag1"}, {"tag2"}}}), reflect.ValueOf(User{Tags: []Tag{{"tag2"}, {"tag3"}}}))
 	assert.Equal(t, User{Tags: []Tag{{"tag1"}, {"tag2"}, {"tag3"}}}, got.Interface())
@@ -284,8 +283,7 @@ func TestWithFieldMergeByKeyFunc(t *testing.T) {
 	type User struct {
 		Tags []string
 	}
-	c := newCoalescer()
-	WithFieldMergeByKeyFunc(reflect.TypeOf(User{}), "Tags", SliceUnion)(c)
+	c := newCoalescer(WithFieldMergeByKeyFunc(reflect.TypeOf(User{}), "Tags", SliceUnion))
 	assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["Tags"])
 	got, err := c.deepMerge(reflect.ValueOf(User{Tags: []string{"tag1", "tag2"}}), reflect.ValueOf(User{Tags: []string{"tag2", "tag3"}}))
 	assert.Equal(t, User{Tags: []string{"tag1", "tag2", "tag3"}}, got.Interface())

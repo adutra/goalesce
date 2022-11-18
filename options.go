@@ -137,6 +137,15 @@ func WithDefaultSliceMergeByIndex() Option {
 	}
 }
 
+// WithDefaultArrayMergeByIndex applies merge-by-index semantics to all arrays to be merged.
+func WithDefaultArrayMergeByIndex() Option {
+	return func(c *coalescer) {
+		c.arrayMerger = func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return c.deepMergeArrayByIndex(v1, v2)
+		}
+	}
+}
+
 // WithSliceSetUnionMerge applies set-union merge semantics to the given slice type. When the slice
 // elements are of a pointer type, this strategy dereferences the pointers and compare their
 // targets. This strategy is fine for slices of simple types and pointers thereof, but it is not
@@ -156,6 +165,16 @@ func WithSliceListAppendMerge(sliceType reflect.Type) Option {
 // mergeKeyFunc will be used to extract the element merge key.
 func WithSliceMergeByIndex(sliceType reflect.Type) Option {
 	return WithSliceMergeByKeyFunc(sliceType, SliceIndex)
+}
+
+// WithArrayMergeByIndex applies merge-by-index semantics to the given slice type. The given
+// mergeKeyFunc will be used to extract the element merge key.
+func WithArrayMergeByIndex(arrayType reflect.Type) Option {
+	return func(c *coalescer) {
+		c.arrayMergers[arrayType] = func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return c.deepMergeArrayByIndex(v1, v2)
+		}
+	}
 }
 
 // WithSliceMergeByID applies merge-by-key semantics to slices whose elements are of some struct

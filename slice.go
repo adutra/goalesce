@@ -39,6 +39,9 @@ var SliceIndex SliceMergeKeyFunc = func(index int, element reflect.Value) (key r
 	return reflect.ValueOf(index), nil
 }
 
+// deepMergeSlice is the default slice merger. It first checks if there is a custom slice merger
+// registered for the slice type. If there is, it uses it. Otherwise, it uses the default slice
+// merge strategy, which is atomic.
 func (c *coalescer) deepMergeSlice(v1, v2 reflect.Value) (reflect.Value, error) {
 	if value, done := checkZero(v1, v2); done {
 		return c.deepCopy(value)
@@ -66,10 +69,10 @@ func (c *coalescer) deepMergeSlice(v1, v2 reflect.Value) (reflect.Value, error) 
 	return c.deepMergeAtomic(v1, v2)
 }
 
-// deepMergeSliceWithListAppend is a slice merger that appends the elements of the second slice to
-// the first slice. It is not the default merge strategy for slices; it is only activated if a slice
-// merger has been registered through one of the options: WithDefaultSliceListAppendMerge,
-// WithSliceListAppendMerge or WithFieldListAppendMerge.
+// deepMergeSliceWithListAppend is an alternate slice merger that appends the elements of the second
+// slice to the first slice. It is not the default merge strategy for slices; it is only activated
+// if a slice merger has been registered through one of the options:
+// WithDefaultSliceListAppendMerge, WithSliceListAppendMerge or WithFieldListAppendMerge.
 func (c *coalescer) deepMergeSliceWithListAppend(v1, v2 reflect.Value) (reflect.Value, error) {
 	if value, done := checkZero(v1, v2); done {
 		return c.deepCopy(value)
@@ -98,11 +101,12 @@ func (c *coalescer) deepMergeSliceWithListAppend(v1, v2 reflect.Value) (reflect.
 
 var typeOfInterface = reflect.TypeOf((*interface{})(nil)).Elem()
 
-// deepMergeSliceWithMergeKey is a slice merger that merges the elements of the two slices using a
-// merge key function. It is not the default merge strategy for slices; it is only activated if a
-// slice merger has been registered through one of the options: WithDefaultSliceSetUnionMerge,
-// WithDefaultSliceMergeByIndex, WithSliceSetUnionMerge,  WithSliceMergeByIndex, WithSliceMergeByID,
-// WithSliceMergeByKeyFunc, WithFieldMergeByIndex, WithFieldMergeByID, WithFieldMergeByKeyFunc.
+// deepMergeSliceWithMergeKey is an alternate slice merger that merges the elements of the two
+// slices using a merge key function. It is not the default merge strategy for slices; it is only
+// activated if a slice merger has been registered through one of the options:
+// WithDefaultSliceSetUnionMerge, WithDefaultSliceMergeByIndex, WithSliceSetUnionMerge,
+// WithSliceMergeByIndex, WithSliceMergeByID, WithSliceMergeByKeyFunc, WithFieldMergeByIndex,
+// WithFieldMergeByID, WithFieldMergeByKeyFunc.
 func (c *coalescer) deepMergeSliceWithMergeKey(v1, v2 reflect.Value, mergeKeyFunc SliceMergeKeyFunc) (reflect.Value, error) {
 	if value, done := checkZero(v1, v2); done {
 		return c.deepCopy(value)

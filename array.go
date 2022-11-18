@@ -16,7 +16,26 @@ package goalesce
 
 import "reflect"
 
+// deepMergeArray is the default array merger. It first checks if there is a custom array merger
+// registered for the array type. If there is, it uses it. Otherwise, it uses the default array
+// merge strategy, which is atomic.
 func (c *coalescer) deepMergeArray(v1, v2 reflect.Value) (reflect.Value, error) {
+	if value, done := checkZero(v1, v2); done {
+		return c.deepCopy(value)
+	}
+	if arrayMerger, found := c.arrayMergers[v1.Type()]; found {
+		return arrayMerger(v1, v2)
+	}
+	if c.arrayMerger != nil {
+		return c.arrayMerger(v1, v2)
+	}
+	return c.deepMergeAtomic(v1, v2)
+}
+
+// deepMergeArrayByIndex is an alternate array merger that merges arrays with by-index semantics. It
+// is not the default merge strategy for arrays; it is only activated if an array merger has been
+// registered through one of the options: WithDefaultArrayMergeByIndex, WithArrayMergeByIndex.
+func (c *coalescer) deepMergeArrayByIndex(v1, v2 reflect.Value) (reflect.Value, error) {
 	if value, done := checkZero(v1, v2); done {
 		return c.deepCopy(value)
 	}

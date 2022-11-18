@@ -36,16 +36,16 @@ When called with no options, `DeepMerge` uses the following merge algorithm:
   - If both values are structs, merge the structs recursively, field by field.
   - For other types (including slices), return the second value ("atomic" semantics).
 
-Note that by default, slices are merged with atomic semantics, that is, the second slice overwrites
-the first one completely. It is possible to change this behavior, see examples below. Arrays,
-however, are always merged with by-index semantics.
+Note that by default, slices and arrays are merged with atomic semantics, that is, the second slice
+or array overwrites the first one completely if it is non-zero. It is possible to change this
+behavior, see examples below.
 
 Both `DeepCopy` and `DeepMerge` can be called with a list of options to modify its default merging
-behavior. See the documentation of each option for details.
+and copying behavior. See the documentation of each option for details.
 
 ## Using DeepCopy
 
-Using DeepCopy is extremely simple:
+Using `DeepCopy` is extremely simple:
 
 ### Copying atomic values
 
@@ -194,9 +194,9 @@ Output:
 
     DeepMerge(map[1:a 2:b], map[2:c 3:d]) = map[1:a 2:c 3:d]
 
-### Merging slices
+### Merging slices and arrays
 
-When both slices are non-zero-values, the default behavior is to apply atomic semantics, that is, to
+When both slices or arrays are non-zero-values, the default behavior is to apply atomic semantics, that is, to
 _replace_ the first slice with the second one:
 
 ```go
@@ -210,8 +210,8 @@ Output:
 
     DeepMerge([1 2], [2 3]) = [2 3]
 
-This is indeed the safest choice when merging slices, but other merging strategies can be used (see
-below).
+This is indeed the safest choice when merging slices and arrays, but other merging strategies can be
+used (see below).
 
 Note: an empty slice is _not_ a zero-value for a slice. Therefore, when the second slice is an empty
 slice, an empty slice is returned:
@@ -252,7 +252,7 @@ that contains all elements from both slices, but no duplicates:
 ```go
 v1 := []int{1, 2}
 v2 := []int{2, 3}
-merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSetUnionMerge())
+merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceSetUnionMerge())
 fmt.Printf("DeepMerge(%v, %v, SetUnion) = %v\n", merged)
 ```
 
@@ -268,7 +268,7 @@ pointers are considered equal, and equal to a non-nil pointer to the zero-value_
 intPtr := func(i int) *int { return &i }
 v1 := []*int{new(int), intPtr(0)} // new(int) and intPtr(0) are equal and point both to the zero-value (0)
 v2 := []*int{nil, intPtr(1)}      // nil will be merged as the zero-value (0)
-merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSetUnionMerge())
+merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceSetUnionMerge())
 for i, elem := range merged.([]*int) {
     fmt.Printf("%v: %T %v\n", i, elem, *elem)
 }
@@ -286,6 +286,13 @@ slices of double pointers.
 The resulting slice's element order is deterministic: each element appears in the order it was first
 encountered when iterating over the two slices.
 
+This strategy is available with two options:
+
+* `WithDefaultSliceSetUnionMerge`: applies this strategy to all slices;
+* `WithSliceSetUnionMerge`: applies this strategy to slices of a given type.
+
+This strategy is not available for arrays.
+
 #### Using "list-append" strategy
 
 The "list-append" strategy appends the second slice to the first one (possibly resulting in
@@ -294,7 +301,7 @@ duplicates):
 ```go
 v1 := []int{1, 2}
 v2 := []int{2, 3}
-merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultListAppendMerge())
+merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceListAppendMerge())
 fmt.Printf("DeepMerge(%v, %v, ListAppend) = %v\n", merged)
 ```
 
@@ -304,6 +311,13 @@ Output
 
 The resulting slice's element order is deterministic.
 
+This strategy is available with two options:
+
+* `WithDefaultSliceListAppendMerge`: applies this strategy to all slices;
+* `WithSliceListAppendMerge`: applies this strategy to slices of a given type.
+
+This strategy is not available for arrays.
+
 #### Using "merge-by-index" strategy
 
 The "merge-by-index" strategy can be used to merge two slices together using their indices as the
@@ -312,13 +326,23 @@ merge key:
 ```go
 v1 := []int{1, 2, 3}
 v2 := []int{-1, -2}
-merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultMergeByIndex())
+merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceMergeByIndex())
 fmt.Printf("DeepMerge(%v, %v, MergeByIndex) = %v\n", v1, v2, merged)
 ```
 
 Output:
 
     DeepMerge([1 2 3], [-1 -2], MergeByIndex) = [-1 -2 3]
+
+This strategy is available for slices with two options:
+
+* `WithDefaultSliceMergeByIndex`: applies this strategy to all slices;
+* `WithSliceMergeByIndex`: applies this strategy to slices of a given type.
+
+This strategy is available for arrays with two options:
+
+* `WithDefaultArrayMergeByIndex`: applies this strategy to all arrays;
+* `WithArrayMergeByIndex`: applies this strategy to arrays of a given type.
 
 #### Using "merge-by-key" strategy
 
@@ -389,6 +413,8 @@ Output:
   }
 ]
 ```    
+
+This strategy is not available for arrays.
 
 ### Merging structs
 

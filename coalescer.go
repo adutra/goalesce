@@ -25,6 +25,8 @@ type coalescer struct {
 	typeMergers    map[reflect.Type]DeepMergeFunc
 	sliceMerger    DeepMergeFunc
 	sliceMergers   map[ /* slice type */ reflect.Type]DeepMergeFunc
+	arrayMerger    DeepMergeFunc
+	arrayMergers   map[ /* slice type */ reflect.Type]DeepMergeFunc
 	fieldMergers   map[ /* struct type */ reflect.Type]map[ /* field name */ string]DeepMergeFunc
 	zeroEmptySlice bool
 	errorOnCycle   bool
@@ -36,6 +38,7 @@ func newCoalescer(opts ...Option) *coalescer {
 		typeCopiers:  make(map[reflect.Type]DeepCopyFunc),
 		typeMergers:  make(map[reflect.Type]DeepMergeFunc),
 		sliceMergers: make(map[reflect.Type]DeepMergeFunc),
+		arrayMergers: make(map[reflect.Type]DeepMergeFunc),
 		fieldMergers: make(map[reflect.Type]map[string]DeepMergeFunc),
 		seen:         make(map[uintptr]bool),
 	}

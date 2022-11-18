@@ -18,9 +18,10 @@ import "reflect"
 
 // deepMergeAtomic merges two values with atomic semantics, that is, it assumes the values are
 // immutable and indivisible and therefore, that there is nothing to be merged. To comply with the
-// general contract of DeepMergeFunc, it returns the first value if the second is the zero-value;
-// otherwise, it returns the second value. By default, this function is used to "merge" all
-// immutable value types (int, string, etc.) and also to merge slices.
+// general contract of DeepMergeFunc, it returns a deep copy of the first value if the second value
+// is the zero-value; otherwise, it returns a deep copy of the second value. By default, this
+// function is used to "merge" all immutable value types (int, string, etc.), and also to merge
+// slices and arrays.
 func (c *coalescer) deepMergeAtomic(v1, v2 reflect.Value) (reflect.Value, error) {
 	if v2.IsZero() {
 		return c.deepCopy(v1)
@@ -29,9 +30,8 @@ func (c *coalescer) deepMergeAtomic(v1, v2 reflect.Value) (reflect.Value, error)
 }
 
 // deepCopyAtomic copies the value with atomic semantics, that is, it assumes the value is immutable
-// and indivisible and therefore, that the value is a copy of itself. Instead, it simply returns the
-// value as is. By default, this function is used to "copy" all immutable value types (int, string,
-// etc.).
+// and indivisible, and that the value is a copy of itself. Therefore, it simply returns the value
+// as is. By default, this function is used to "copy" all immutable value types (int, string, etc.).
 func (c *coalescer) deepCopyAtomic(v reflect.Value) (reflect.Value, error) {
 	return v, nil
 }

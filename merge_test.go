@@ -195,21 +195,21 @@ func TestDeepMerge(t *testing.T) {
 			name: "[]int union",
 			v1:   []int{1, 3},
 			v2:   []int{1, 2},
-			opts: []Option{WithDefaultSetUnionMerge()},
+			opts: []Option{WithDefaultSliceSetUnionMerge()},
 			want: []int{1, 3, 2},
 		},
 		{
 			name: "[]int append",
 			v1:   []int{1, 3},
 			v2:   []int{1, 2},
-			opts: []Option{WithDefaultListAppendMerge()},
+			opts: []Option{WithDefaultSliceListAppendMerge()},
 			want: []int{1, 3, 1, 2},
 		},
 		{
 			name: "[]foo custom",
 			v1:   []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
 			v2:   []foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-			opts: []Option{WithMergeByID(reflect.TypeOf([]foo{}), "FieldInt")},
+			opts: []Option{WithSliceMergeByID(reflect.TypeOf([]foo{}), "FieldInt")},
 			want: []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 		},
 		{
@@ -217,7 +217,7 @@ func TestDeepMerge(t *testing.T) {
 			v1:   []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
 			v2:   []*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 			opts: []Option{
-				WithMergeByKeyFunc(
+				WithSliceMergeByKeyFunc(
 					reflect.TypeOf([]*foo{}),
 					func(_ int, v reflect.Value) (reflect.Value, error) {
 						i := v.Interface()
@@ -231,8 +231,8 @@ func TestDeepMerge(t *testing.T) {
 			v1:   []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
 			v2:   []*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 			opts: []Option{
-				WithMergeByID(reflect.TypeOf([]*foo{}), "FieldInt"),
-				WithListAppendMerge(reflect.TypeOf([]*foo{}))}, // will prevail
+				WithSliceMergeByID(reflect.TypeOf([]*foo{}), "FieldInt"),
+				WithSliceListAppendMerge(reflect.TypeOf([]*foo{}))}, // will prevail
 			want: []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
 		},
 		{

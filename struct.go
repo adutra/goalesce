@@ -114,7 +114,7 @@ func (c *coalescer) appendFieldMerger(structType reflect.Type, field reflect.Str
 	if field.Type.Kind() != reflect.Slice {
 		return nil, fmt.Errorf("field %s.%s: %s strategy is only supported for slices", structType.String(), field.Name, MergeStrategyAppend)
 	}
-	return c.deepMergeSliceWithAppend, nil
+	return c.deepMergeSliceWithListAppend, nil
 }
 
 func (c *coalescer) unionFieldMerger(structType reflect.Type, field reflect.StructField) (DeepMergeFunc, error) {

@@ -109,18 +109,18 @@ func WithZeroEmptySliceMerge() Option {
 	}
 }
 
-// WithDefaultListAppendMerge applies list-append merge semantics to all slices to be merged.
-func WithDefaultListAppendMerge() Option {
+// WithDefaultSliceListAppendMerge applies list-append merge semantics to all slices to be merged.
+func WithDefaultSliceListAppendMerge() Option {
 	return func(c *coalescer) {
-		c.sliceMerger = c.deepMergeSliceWithAppend
+		c.sliceMerger = c.deepMergeSliceWithListAppend
 	}
 }
 
-// WithDefaultSetUnionMerge applies set-union merge semantics to all slices to be merged. When the
-// slice elements are pointers, this strategy dereferences the pointers and compare their targets.
-// This strategy is fine for slices of simple types and pointers thereof, but it is not recommended
-// for slices of complex types as the elements may not be fully comparable.
-func WithDefaultSetUnionMerge() Option {
+// WithDefaultSliceSetUnionMerge applies set-union merge semantics to all slices to be merged. When
+// the slice elements are pointers, this strategy dereferences the pointers and compare their
+// targets. This strategy is fine for slices of simple types and pointers thereof, but it is not
+// recommended for slices of complex types as the elements may not be fully comparable.
+func WithDefaultSliceSetUnionMerge() Option {
 	return func(c *coalescer) {
 		c.sliceMerger = func(v1, v2 reflect.Value) (reflect.Value, error) {
 			return c.deepMergeSliceWithMergeKey(v1, v2, SliceUnion)
@@ -128,8 +128,8 @@ func WithDefaultSetUnionMerge() Option {
 	}
 }
 
-// WithDefaultMergeByIndex applies merge-by-index semantics to all slices to be merged.
-func WithDefaultMergeByIndex() Option {
+// WithDefaultSliceMergeByIndex applies merge-by-index semantics to all slices to be merged.
+func WithDefaultSliceMergeByIndex() Option {
 	return func(c *coalescer) {
 		c.sliceMerger = func(v1, v2 reflect.Value) (reflect.Value, error) {
 			return c.deepMergeSliceWithMergeKey(v1, v2, SliceIndex)
@@ -137,40 +137,40 @@ func WithDefaultMergeByIndex() Option {
 	}
 }
 
-// WithSetUnionMerge applies set-union merge semantics to the given slice type. When the slice
+// WithSliceSetUnionMerge applies set-union merge semantics to the given slice type. When the slice
 // elements are of a pointer type, this strategy dereferences the pointers and compare their
 // targets. This strategy is fine for slices of simple types and pointers thereof, but it is not
 // recommended for slices of complex types as the elements may not be fully comparable.
-func WithSetUnionMerge(sliceType reflect.Type) Option {
-	return WithMergeByKeyFunc(sliceType, SliceUnion)
+func WithSliceSetUnionMerge(sliceType reflect.Type) Option {
+	return WithSliceMergeByKeyFunc(sliceType, SliceUnion)
 }
 
-// WithListAppendMerge applies list-append merge semantics to the given slice type.
-func WithListAppendMerge(sliceType reflect.Type) Option {
+// WithSliceListAppendMerge applies list-append merge semantics to the given slice type.
+func WithSliceListAppendMerge(sliceType reflect.Type) Option {
 	return func(c *coalescer) {
-		c.sliceMergers[sliceType] = c.deepMergeSliceWithAppend
+		c.sliceMergers[sliceType] = c.deepMergeSliceWithListAppend
 	}
 }
 
-// WithMergeByIndex applies merge-by-index semantics to the given slice type. The given mergeKeyFunc
-// will be used to extract the element merge key.
-func WithMergeByIndex(sliceType reflect.Type) Option {
-	return WithMergeByKeyFunc(sliceType, SliceIndex)
+// WithSliceMergeByIndex applies merge-by-index semantics to the given slice type. The given
+// mergeKeyFunc will be used to extract the element merge key.
+func WithSliceMergeByIndex(sliceType reflect.Type) Option {
+	return WithSliceMergeByKeyFunc(sliceType, SliceIndex)
 }
 
-// WithMergeByID applies merge-by-key semantics to slices whose elements are of some struct type, or
-// a pointer thereto. The passed field name will be used to extract the element's merge key;
-// therefore, the field should generally be a unique identifier or primary key for objects of this
-// type.
-func WithMergeByID(sliceOfStructType reflect.Type, elemField string) Option {
+// WithSliceMergeByID applies merge-by-key semantics to slices whose elements are of some struct
+// type, or a pointer thereto. The passed field name will be used to extract the element's merge
+// key; therefore, the field should generally be a unique identifier or primary key for objects of
+// this type.
+func WithSliceMergeByID(sliceOfStructType reflect.Type, elemField string) Option {
 	return func(c *coalescer) {
-		WithMergeByKeyFunc(sliceOfStructType, newMergeByField(elemField))(c)
+		WithSliceMergeByKeyFunc(sliceOfStructType, newMergeByField(elemField))(c)
 	}
 }
 
-// WithMergeByKeyFunc applies merge-by-key semantics to the given slice type. The given
+// WithSliceMergeByKeyFunc applies merge-by-key semantics to the given slice type. The given
 // SliceMergeKeyFunc will be used to extract the element merge key.
-func WithMergeByKeyFunc(sliceType reflect.Type, mergeKeyFunc SliceMergeKeyFunc) Option {
+func WithSliceMergeByKeyFunc(sliceType reflect.Type, mergeKeyFunc SliceMergeKeyFunc) Option {
 	return func(c *coalescer) {
 		c.sliceMergers[sliceType] = func(v1, v2 reflect.Value) (reflect.Value, error) {
 			return c.deepMergeSliceWithMergeKey(v1, v2, mergeKeyFunc)
@@ -200,15 +200,15 @@ func WithFieldMergerProvider(structType reflect.Type, field string, provider fun
 	}
 }
 
-// WithFieldListAppendMerge merges the given struct field with list-append semantics. The field must be
-// of slice type. This is the programmatic equivalent of adding a `goalesce:append` struct tag to
+// WithFieldListAppendMerge merges the given struct field with list-append semantics. The field must
+// be of slice type. This is the programmatic equivalent of adding a `goalesce:append` struct tag to
 // that field.
 func WithFieldListAppendMerge(structType reflect.Type, field string) Option {
 	return func(c *coalescer) {
 		if c.fieldMergers[structType] == nil {
 			c.fieldMergers[structType] = make(map[string]DeepMergeFunc)
 		}
-		c.fieldMergers[structType][field] = c.deepMergeSliceWithAppend
+		c.fieldMergers[structType][field] = c.deepMergeSliceWithListAppend
 	}
 }
 

@@ -135,7 +135,7 @@ func TestWithAtomicFieldMerge(t *testing.T) {
 
 func TestWithDefaultListAppendMerge(t *testing.T) {
 	c := newCoalescer()
-	WithDefaultListAppendMerge()(c)
+	WithDefaultSliceListAppendMerge()(c)
 	assert.NotNil(t, c.sliceMerger)
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{2, 3}))
 	assert.Equal(t, []int{1, 2, 2, 3}, got.Interface())
@@ -144,7 +144,7 @@ func TestWithDefaultListAppendMerge(t *testing.T) {
 
 func TestWithDefaultMergeByIndex(t *testing.T) {
 	c := newCoalescer()
-	WithDefaultMergeByIndex()(c)
+	WithDefaultSliceMergeByIndex()(c)
 	assert.NotNil(t, c.sliceMerger)
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{-1}))
 	assert.Equal(t, []int{-1, 2}, got.Interface())
@@ -153,7 +153,7 @@ func TestWithDefaultMergeByIndex(t *testing.T) {
 
 func TestWithDefaultSetUnionMerge(t *testing.T) {
 	c := newCoalescer()
-	WithDefaultSetUnionMerge()(c)
+	WithDefaultSliceSetUnionMerge()(c)
 	assert.NotNil(t, c.sliceMerger)
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{2, 3}))
 	assert.Equal(t, []int{1, 2, 3}, got.Interface())
@@ -168,7 +168,7 @@ func TestWithErrorOnCycle(t *testing.T) {
 
 func TestWithListAppendMerge(t *testing.T) {
 	c := newCoalescer()
-	WithListAppendMerge(reflect.TypeOf([]int{}))(c)
+	WithSliceListAppendMerge(reflect.TypeOf([]int{}))(c)
 	assert.NotNil(t, c.sliceMergers[reflect.TypeOf([]int{})])
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{2, 3}))
 	assert.Equal(t, []int{1, 2, 2, 3}, got.Interface())
@@ -177,7 +177,7 @@ func TestWithListAppendMerge(t *testing.T) {
 
 func TestWithSetUnionMerge(t *testing.T) {
 	c := newCoalescer()
-	WithSetUnionMerge(reflect.TypeOf([]int{}))(c)
+	WithSliceSetUnionMerge(reflect.TypeOf([]int{}))(c)
 	assert.NotNil(t, c.sliceMergers[reflect.TypeOf([]int{})])
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{2, 3}))
 	assert.Equal(t, []int{1, 2, 3}, got.Interface())
@@ -186,7 +186,7 @@ func TestWithSetUnionMerge(t *testing.T) {
 
 func TestWithMergeByIndex(t *testing.T) {
 	c := newCoalescer()
-	WithMergeByIndex(reflect.TypeOf([]int{}))(c)
+	WithSliceMergeByIndex(reflect.TypeOf([]int{}))(c)
 	assert.NotNil(t, c.sliceMergers[reflect.TypeOf([]int{})])
 	got, err := c.deepMerge(reflect.ValueOf([]int{1, 2}), reflect.ValueOf([]int{-1}))
 	assert.Equal(t, []int{-1, 2}, got.Interface())
@@ -203,7 +203,7 @@ func TestWithMergeByKey(t *testing.T) {
 		called = true
 		return element.FieldByName("ID"), nil
 	}
-	WithMergeByKeyFunc(reflect.TypeOf([]User{}), mergeKeyFunc)(c)
+	WithSliceMergeByKeyFunc(reflect.TypeOf([]User{}), mergeKeyFunc)(c)
 	assert.NotNil(t, c.sliceMergers[reflect.TypeOf([]User{})])
 	got, err := c.deepMerge(reflect.ValueOf([]User{{"Alice"}, {"Bob"}}), reflect.ValueOf([]User{{"Bob"}, {"Alice"}}))
 	assert.Equal(t, []User{{"Alice"}, {"Bob"}}, got.Interface())
@@ -216,7 +216,7 @@ func TestWithMergeByField(t *testing.T) {
 		ID string
 	}
 	c := newCoalescer()
-	WithMergeByID(reflect.TypeOf([]User{}), "ID")(c)
+	WithSliceMergeByID(reflect.TypeOf([]User{}), "ID")(c)
 	assert.NotNil(t, c.sliceMergers[reflect.TypeOf([]User{})])
 	got, err := c.deepMerge(reflect.ValueOf([]User{{"Alice"}, {"Bob"}}), reflect.ValueOf([]User{{"Bob"}, {"Alice"}}))
 	assert.Equal(t, []User{{"Alice"}, {"Bob"}}, got.Interface())

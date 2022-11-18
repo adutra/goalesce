@@ -123,25 +123,25 @@ func Example() {
 	// Merging slices with set-union semantics
 	v1 = []int{1, 2}
 	v2 = []int{2, 3}
-	merged, _ = goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSetUnionMerge())
+	merged, _ = goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceSetUnionMerge())
 	fmt.Printf("DeepMerge(%+v, %+v, SetUnion) = %+v\n", v1, v2, merged)
 
 	// Merging slices with list-append semantics
 	v1 = []int{1, 2}
 	v2 = []int{2, 3}
-	merged, _ = goalesce.DeepMerge(v1, v2, goalesce.WithDefaultListAppendMerge())
+	merged, _ = goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceListAppendMerge())
 	fmt.Printf("DeepMerge(%+v, %+v, ListAppend) = %+v\n", v1, v2, merged)
 
 	// Merging slices with merge-by-index semantics
 	v1 = []int{1, 2, 3}
 	v2 = []int{-1, -2}
-	merged, _ = goalesce.DeepMerge(v1, v2, goalesce.WithDefaultMergeByIndex())
+	merged, _ = goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceMergeByIndex())
 	fmt.Printf("DeepMerge(%+v, %+v, MergeByIndex) = %+v\n", v1, v2, merged)
 
 	// Merging slices with merge-by-id semantics, merge key = field User.ID
 	v1 = []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 	v2 = []User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
-	merged, _ = goalesce.DeepMerge(v1, v2, goalesce.WithMergeByID(reflect.TypeOf([]User{}), "ID"))
+	merged, _ = goalesce.DeepMerge(v1, v2, goalesce.WithSliceMergeByID(reflect.TypeOf([]User{}), "ID"))
 	fmt.Printf("DeepMerge(%+v, %+v, MergeByID) = %+v\n", v1, v2, merged)
 
 	// Merging structs with custom field strategies
@@ -224,11 +224,11 @@ func Example() {
 	// }
 }
 
-func ExampleWithDefaultSetUnionMerge() {
+func ExampleWithDefaultSliceSetUnionMerge() {
 	{
 		v1 := []int{1, 2}
 		v2 := []int{2, 3}
-		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSetUnionMerge())
+		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceSetUnionMerge())
 		fmt.Printf("DeepMerge(%+v, %+v, SetUnion) = %+v\n", v1, v2, merged)
 	}
 	{
@@ -236,7 +236,7 @@ func ExampleWithDefaultSetUnionMerge() {
 		intPtr := func(i int) *int { return &i }
 		v1 := []*int{new(int), intPtr(0)} // new(int) and intPtr(0) are equal and point both to 0
 		v2 := []*int{nil, intPtr(1)}      // nil will be merged as the zero-value (0)
-		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSetUnionMerge())
+		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceSetUnionMerge())
 		fmt.Printf("DeepMerge(%+v, %+v, SetUnion) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(merged))
 	}
 	// output:
@@ -244,11 +244,11 @@ func ExampleWithDefaultSetUnionMerge() {
 	// DeepMerge([&0 &0], [*int(nil) &1], SetUnion) = [&0 &1]
 }
 
-func ExampleWithDefaultListAppendMerge() {
+func ExampleWithDefaultSliceListAppendMerge() {
 	{
 		v1 := []int{1, 2}
 		v2 := []int{2, 3}
-		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultListAppendMerge())
+		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceListAppendMerge())
 		fmt.Printf("DeepMerge(%+v, %+v, ListAppend) = %+v\n", v1, v2, merged)
 	}
 	{
@@ -256,7 +256,7 @@ func ExampleWithDefaultListAppendMerge() {
 		intPtr := func(i int) *int { return &i }
 		v1 := []*int{new(int), intPtr(0)}
 		v2 := []*int{(*int)(nil), intPtr(1)}
-		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultListAppendMerge())
+		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceListAppendMerge())
 		fmt.Printf("DeepMerge(%+v, %+v, ListAppend) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(merged))
 	}
 	// output:
@@ -264,11 +264,11 @@ func ExampleWithDefaultListAppendMerge() {
 	// DeepMerge([&0 &0], [*int(nil) &1], ListAppend) = [&0 &0 *int(nil) &1]
 }
 
-func ExampleWithDefaultMergeByIndex() {
+func ExampleWithDefaultSliceMergeByIndex() {
 	{
 		v1 := []int{1, 2, 3}
 		v2 := []int{-1, -2}
-		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultMergeByIndex())
+		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceMergeByIndex())
 		fmt.Printf("DeepMerge(%+v, %+v, MergeByIndex) = %+v\n", v1, v2, merged)
 	}
 	{
@@ -276,7 +276,7 @@ func ExampleWithDefaultMergeByIndex() {
 		intPtr := func(i int) *int { return &i }
 		v1 := []*int{intPtr(1), intPtr(2), intPtr(3)}
 		v2 := []*int{nil, intPtr(-2)}
-		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultMergeByIndex())
+		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithDefaultSliceMergeByIndex())
 		fmt.Printf("DeepMerge(%+v, %+v, MergeByIndex) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(merged))
 	}
 	// output:
@@ -284,18 +284,18 @@ func ExampleWithDefaultMergeByIndex() {
 	// DeepMerge([&1 &2 &3], [*int(nil) &-2], MergeByIndex) = [&1 &-2 &3]
 }
 
-func ExampleWithMergeByID() {
+func ExampleWithSliceMergeByID() {
 	{
 		v1 := []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 		v2 := []User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
-		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithMergeByID(reflect.TypeOf([]User{}), "ID"))
+		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithSliceMergeByID(reflect.TypeOf([]User{}), "ID"))
 		fmt.Printf("DeepMerge(%+v, %+v, MergeByID) = %+v\n", v1, v2, merged)
 	}
 	{
 		// slice of pointers
 		v1 := []*User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 		v2 := []*User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
-		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithMergeByID(reflect.TypeOf([]*User{}), "ID"))
+		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithSliceMergeByID(reflect.TypeOf([]*User{}), "ID"))
 		fmt.Printf("DeepMerge(%+v, %+v, MergeByID) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(merged))
 	}
 	// output:
@@ -303,14 +303,14 @@ func ExampleWithMergeByID() {
 	// DeepMerge([&{ID:1 Name:Alice Age:0} &{ID:2 Name:Bob Age:0}], [&{ID:2 Name: Age:30} &{ID:1 Name: Age:20}], MergeByID) = [&{ID:1 Name:Alice Age:20} &{ID:2 Name:Bob Age:30}]
 }
 
-func ExampleWithMergeByKeyFunc() {
+func ExampleWithSliceMergeByKeyFunc() {
 	{
 		v1 := []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
 		v2 := []User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
 		mergeKeyFunc := func(_ int, v reflect.Value) (reflect.Value, error) {
 			return v.FieldByName("ID"), nil
 		}
-		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithMergeByKeyFunc(reflect.TypeOf([]User{}), mergeKeyFunc))
+		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithSliceMergeByKeyFunc(reflect.TypeOf([]User{}), mergeKeyFunc))
 		fmt.Printf("DeepMerge(%+v, %+v, MergeByKeyFunc) = %+v\n", v1, v2, merged)
 	}
 	{
@@ -319,7 +319,7 @@ func ExampleWithMergeByKeyFunc() {
 		mergeKeyFunc := func(_ int, v reflect.Value) (reflect.Value, error) {
 			return v.Elem().FieldByName("ID"), nil
 		}
-		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithMergeByKeyFunc(reflect.TypeOf([]*User{}), mergeKeyFunc))
+		merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithSliceMergeByKeyFunc(reflect.TypeOf([]*User{}), mergeKeyFunc))
 		fmt.Printf("DeepMerge(%+v, %+v, MergeByKeyFunc) = %+v\n", printPtrSlice(v1), printPtrSlice(v2), printPtrSlice(merged))
 	}
 	// output:

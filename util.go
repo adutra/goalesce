@@ -19,6 +19,20 @@ import (
 	"reflect"
 )
 
+// zero returns the zero-value of type T.
+func zero[T any]() (z T) {
+	return z
+}
+
+// cast converts v to a value of type T, or returns an error if v is not of type T.
+func cast[T any](v reflect.Value) (T, error) {
+	itf, ok := v.Interface().(T)
+	if !ok {
+		return itf, fmt.Errorf("cannot convert %s to %T", v.Type(), itf)
+	}
+	return itf, nil
+}
+
 // safeIndirect is a variant of reflect.Indirect that returns a zero-value if the value is a nil
 // pointer. Because of that, this function never returns an invalid value.
 func safeIndirect(v reflect.Value) reflect.Value {
@@ -46,9 +60,9 @@ func checkZero(v1, v2 reflect.Value) (reflect.Value, bool) {
 	return reflect.Value{}, false
 }
 
-func checkTypesMatch(v1, v2 reflect.Value) error {
-	if v1.Type() != v2.Type() {
-		return fmt.Errorf("types do not match: %s != %s", v1.Type().String(), v2.Type().String())
+func checkTypesMatch(v1, v2 reflect.Type) error {
+	if v1 != v2 {
+		return fmt.Errorf("types do not match: %s != %s", v1.String(), v2.String())
 	}
 	return nil
 }

@@ -224,6 +224,110 @@ func Example() {
 	// }
 }
 
+func ExampleWithTypeCopier() {
+	negatingCopier := func(v reflect.Value) (reflect.Value, error) {
+		result := reflect.New(v.Type()).Elem()
+		result.SetInt(-v.Int())
+		return result, nil
+	}
+	v := 1
+	copied, err := goalesce.DeepCopy(v, goalesce.WithTypeCopier(reflect.TypeOf(v), negatingCopier))
+	fmt.Printf("DeepCopy(%+v, WithTypeCopier) = %+v, %v\n", v, copied, err)
+	// output:
+	// DeepCopy(1, WithTypeCopier) = -1, <nil>
+}
+
+func ExampleWithTypeMerger() {
+	summingMerger := func(v1, v2 reflect.Value) (reflect.Value, error) {
+		result := reflect.New(v1.Type()).Elem()
+		result.SetInt(v1.Int() + v2.Int())
+		return result, nil
+	}
+	v1 := 1
+	v2 := 2
+	merged, err := goalesce.DeepMerge(v1, v2, goalesce.WithTypeMerger(reflect.TypeOf(v1), summingMerger))
+	fmt.Printf("DeepMerge(%+v, %+v, WithTypeMerger) = %+v, %v\n", v1, v2, merged, err)
+	// output:
+	// DeepMerge(1, 2, WithTypeMerger) = 3, <nil>
+}
+
+func ExampleWithTypeCopierProvider() {
+	userCopierProvider := func(mainCopier goalesce.DeepCopyFunc) goalesce.DeepCopyFunc {
+		return func(v reflect.Value) (reflect.Value, error) {
+			if v.FieldByName("ID").Int() == 1 {
+				return reflect.Value{}, errors.New("user 1 has been deleted")
+			}
+			result := reflect.New(v.Type()).Elem()
+			id, err := mainCopier(v.FieldByName("ID"))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			result.FieldByName("ID").Set(id)
+			name, err := mainCopier(v.FieldByName("Name"))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			result.FieldByName("Name").Set(name)
+			return result, nil
+		}
+	}
+	{
+		v := User{ID: 1, Name: "Alice"}
+		copied, err := goalesce.DeepCopy(v, goalesce.WithTypeCopierProvider(reflect.TypeOf(User{}), userCopierProvider))
+		fmt.Printf("DeepCopy(%+v, WithTypeCopier) = %+v, %v\n", v, copied, err)
+	}
+	{
+		v := User{ID: 2, Name: "Bob"}
+		copied, err := goalesce.DeepCopy(v, goalesce.WithTypeCopierProvider(reflect.TypeOf(User{}), userCopierProvider))
+		fmt.Printf("DeepCopy(%+v, WithTypeCopier) = %+v, %v\n", v, copied, err)
+	}
+	// output:
+	// DeepCopy({ID:1 Name:Alice Age:0}, WithTypeCopier) = {ID:0 Name: Age:0}, user 1 has been deleted
+	// DeepCopy({ID:2 Name:Bob Age:0}, WithTypeCopier) = {ID:2 Name:Bob Age:0}, <nil>
+}
+
+func ExampleWithTypeMergerProvider() {
+	userMergerProvider := func(mainMerger goalesce.DeepMergeFunc, mainCopier goalesce.DeepCopyFunc) goalesce.DeepMergeFunc {
+		return func(v1, v2 reflect.Value) (reflect.Value, error) {
+			if v1.FieldByName("ID").Int() == 1 {
+				return reflect.Value{}, errors.New("user 1 has been deleted")
+			}
+			result := reflect.New(v1.Type()).Elem()
+			id, err := mainCopier(v1.FieldByName("ID"))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			result.FieldByName("ID").Set(id)
+			name, err := mainMerger(v1.FieldByName("Name"), v2.FieldByName("Name"))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			result.FieldByName("Name").Set(name)
+			age, err := mainMerger(v1.FieldByName("Age"), v2.FieldByName("Age"))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			result.FieldByName("Age").Set(age)
+			return result, nil
+		}
+	}
+	{
+		v1 := User{ID: 1, Name: "Alice"}
+		v2 := User{ID: 1, Age: 20}
+		merged, err := goalesce.DeepMerge(v1, v2, goalesce.WithTypeMergerProvider(reflect.TypeOf(User{}), userMergerProvider))
+		fmt.Printf("DeepMerge(%+v, %+v, WithTypeMerger) = %+v, %v\n", v1, v2, merged, err)
+	}
+	{
+		v1 := User{ID: 2, Name: "Bob"}
+		v2 := User{ID: 2, Age: 30}
+		merged, err := goalesce.DeepMerge(v1, v2, goalesce.WithTypeMergerProvider(reflect.TypeOf(User{}), userMergerProvider))
+		fmt.Printf("DeepMerge(%+v, %+v, WithTypeMerger) = %+v, %v\n", v1, v2, merged, err)
+	}
+	// output:
+	// DeepMerge({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithTypeMerger) = {ID:0 Name: Age:0}, user 1 has been deleted
+	// DeepMerge({ID:2 Name:Bob Age:0}, {ID:2 Name: Age:30}, WithTypeMerger) = {ID:2 Name:Bob Age:30}, <nil>
+}
+
 func ExampleWithDefaultSliceSetUnionMerge() {
 	{
 		v1 := []int{1, 2}
@@ -327,59 +431,13 @@ func ExampleWithSliceMergeByKeyFunc() {
 	// DeepMerge([&{ID:1 Name:Alice Age:0} &{ID:2 Name:Bob Age:0}], [&{ID:2 Name: Age:30} &{ID:1 Name: Age:20}], MergeByKeyFunc) = [&{ID:1 Name:Alice Age:20} &{ID:2 Name:Bob Age:30}]
 }
 
-func ExampleWithTypeCopier() {
-	userCopier := func(v reflect.Value) (reflect.Value, error) {
-		if v.FieldByName("ID").Int() == 1 {
-			return reflect.Value{}, errors.New("user 1 has been deleted")
-		}
-		return reflect.Value{}, nil // delegate to parent coalescer
-	}
-	{
-		v := User{ID: 1, Name: "Alice"}
-		copied, err := goalesce.DeepCopy(v, goalesce.WithTypeCopier(reflect.TypeOf(User{}), userCopier))
-		fmt.Printf("DeepCopy(%+v, WithTypeCopier) = %+v, %v\n", v, copied, err)
-	}
-	{
-		v := User{ID: 2, Name: "Bob"}
-		copied, err := goalesce.DeepCopy(v, goalesce.WithTypeCopier(reflect.TypeOf(User{}), userCopier))
-		fmt.Printf("DeepCopy(%+v, WithTypeCopier) = %+v, %v\n", v, copied, err)
-	}
-	// output:
-	// DeepCopy({ID:1 Name:Alice Age:0}, WithTypeCopier) = <nil>, user 1 has been deleted
-	// DeepCopy({ID:2 Name:Bob Age:0}, WithTypeCopier) = {ID:2 Name:Bob Age:0}, <nil>
-}
-
-func ExampleWithTypeMerger() {
-	userMerger := func(v1, v2 reflect.Value) (reflect.Value, error) {
-		if v1.FieldByName("ID").Int() == 1 {
-			return reflect.Value{}, errors.New("user 1 has been deleted")
-		}
-		return reflect.Value{}, nil // delegate to parent coalescer
-	}
-	{
-		v1 := User{ID: 1, Name: "Alice"}
-		v2 := User{ID: 1, Age: 20}
-		merged, err := goalesce.DeepMerge(v1, v2, goalesce.WithTypeMerger(reflect.TypeOf(User{}), userMerger))
-		fmt.Printf("DeepMerge(%+v, %+v, WithTypeMerger) = %+v, %v\n", v1, v2, merged, err)
-	}
-	{
-		v1 := User{ID: 2, Name: "Bob"}
-		v2 := User{ID: 2, Age: 30}
-		merged, err := goalesce.DeepMerge(v1, v2, goalesce.WithTypeMerger(reflect.TypeOf(User{}), userMerger))
-		fmt.Printf("DeepMerge(%+v, %+v, WithTypeMerger) = %+v, %v\n", v1, v2, merged, err)
-	}
-	// output:
-	// DeepMerge({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithTypeMerger) = <nil>, user 1 has been deleted
-	// DeepMerge({ID:2 Name:Bob Age:0}, {ID:2 Name: Age:30}, WithTypeMerger) = {ID:2 Name:Bob Age:30}, <nil>
-}
-
 func ExampleWithFieldMergerProvider() {
-	userMergerProvider := func(parent goalesce.DeepMergeFunc) goalesce.DeepMergeFunc {
+	userMergerProvider := func(mainMerger goalesce.DeepMergeFunc, mainCopier goalesce.DeepCopyFunc) goalesce.DeepMergeFunc {
 		return func(v1, v2 reflect.Value) (reflect.Value, error) {
 			if v1.Int() == 1 {
 				return reflect.Value{}, errors.New("user 1 has been deleted")
 			}
-			return parent(v1, v2) // call parent coalescer explicitly
+			return mainMerger(v1, v2) // delegate to main merger
 		}
 	}
 	{
@@ -395,7 +453,7 @@ func ExampleWithFieldMergerProvider() {
 		fmt.Printf("DeepMerge(%+v, %+v, WithFieldMergerProvider) = %+v, %v\n", v1, v2, merged, err)
 	}
 	// output:
-	// DeepMerge({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithFieldMergerProvider) = <nil>, user 1 has been deleted
+	// DeepMerge({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithFieldMergerProvider) = {ID:0 Name: Age:0}, user 1 has been deleted
 	// DeepMerge({ID:2 Name:Bob Age:0}, {ID:2 Name: Age:30}, WithFieldMergerProvider) = {ID:2 Name:Bob Age:30}, <nil>
 }
 

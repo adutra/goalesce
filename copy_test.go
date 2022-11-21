@@ -24,125 +24,114 @@ import (
 func TestDeepCopy(t *testing.T) {
 	// Note: we don't need to test all the types and corner cases here, as the underlying copy
 	// functions are thoroughly tested.
-	type foo struct {
-		FieldInt    int
-		FieldIntPtr *int
-		FieldString string
-		FieldSlice  []int
-		FieldMap    map[string]int
-	}
-	tests := []struct {
-		name    string
-		v       interface{}
-		want    interface{}
-		opts    []Option
-		wantErr assert.ErrorAssertionFunc
-	}{
-		{
-			name: "untyped nil",
-			v:    nil,
-			want: nil,
-		},
-		{
-			name: "typed nil",
-			v:    (*int)(nil),
-			want: (*int)(nil),
-		},
-		{
-			name: "string",
-			v:    "abc",
-			want: "abc",
-		},
-		{
-			name: "int",
-			v:    123,
-			want: 123,
-		},
-		{
-			name: "*int",
-			v:    intPtr(123),
-			want: intPtr(123),
-		},
-		{
-			name: "[]int",
-			v:    []int{1, 2, 3},
-			want: []int{1, 2, 3},
-		},
-		{
-			name: "[]*int",
-			v:    []*int{intPtr(1), intPtr(2), intPtr(3)},
-			want: []*int{intPtr(1), intPtr(2), intPtr(3)},
-		},
-		{
-			name: "[3]int",
-			v:    [3]int{1, 2, 3},
-			want: [3]int{1, 2, 3},
-		},
-		{
-			name: "[3]*int",
-			v:    [3]*int{intPtr(1), intPtr(2), intPtr(3)},
-			want: [3]*int{intPtr(1), intPtr(2), intPtr(3)},
-		},
-		{
-			name: "map[string]int",
-			v:    map[string]int{"a": 1, "b": 2, "c": 3},
-			want: map[string]int{"a": 1, "b": 2, "c": 3},
-		},
-		{
-			name: "map[string]*int",
-			v:    map[string]*int{"a": intPtr(1), "b": intPtr(2), "c": intPtr(3)},
-			want: map[string]*int{"a": intPtr(1), "b": intPtr(2), "c": intPtr(3)},
-		},
-		{
-			name: "struct",
-			v: &foo{
-				FieldInt:    123,
-				FieldIntPtr: intPtr(123),
-				FieldString: "abc",
-				FieldSlice:  []int{1, 2, 3},
-				FieldMap:    map[string]int{"a": 1, "b": 2, "c": 3},
-			},
-			want: &foo{
-				FieldInt:    123,
-				FieldIntPtr: intPtr(123),
-				FieldString: "abc",
-				FieldSlice:  []int{1, 2, 3},
-				FieldMap:    map[string]int{"a": 1, "b": 2, "c": 3},
-			},
-		},
-		{
-			name: "with type copier",
-			v:    "abc",
-			want: "def",
-			opts: []Option{
-				WithTypeCopier(reflect.TypeOf(""), func(v reflect.Value) (reflect.Value, error) {
-					return reflect.ValueOf("def"), nil
-				}),
-			},
-		},
-		{
-			name:    "error",
-			v:       123,
-			opts:    []Option{withMockDeepCopyError},
-			wantErr: assert.Error,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := DeepCopy(tt.v, tt.opts...)
-			if err == nil {
-				assert.Equal(t, tt.want, got)
-				assertNotSame(t, tt.v, got)
-			} else {
-				assert.Nil(t, got)
-			}
-			if tt.wantErr != nil {
-				tt.wantErr(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	t.Run("untyped nil", func(t *testing.T) {
+		var x interface{}
+		got, err := DeepCopy(x)
+		assert.Nil(t, got)
+		assert.NoError(t, err)
+	})
+	t.Run("typed nil", func(t *testing.T) {
+		var x *int
+		got, err := DeepCopy(x)
+		assert.Nil(t, got)
+		assert.NoError(t, err)
+	})
+	t.Run("int", func(t *testing.T) {
+		x := 123
+		got, err := DeepCopy(x)
+		assert.Equal(t, 123, got)
+		assert.NoError(t, err)
+	})
+	t.Run("string", func(t *testing.T) {
+		x := "abc"
+		got, err := DeepCopy(x)
+		assert.Equal(t, "abc", got)
+		assert.NoError(t, err)
+	})
+	t.Run("[]int", func(t *testing.T) {
+		x := []int{1, 2, 3}
+		got, err := DeepCopy(x)
+		assert.Equal(t, []int{1, 2, 3}, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[]*int", func(t *testing.T) {
+		x := []*int{intPtr(1), intPtr(2), intPtr(3)}
+		got, err := DeepCopy(x)
+		assert.Equal(t, []*int{intPtr(1), intPtr(2), intPtr(3)}, got)
+		assertNotSame(t, x, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[3]int", func(t *testing.T) {
+		x := [3]int{1, 2, 3}
+		got, err := DeepCopy(x)
+		assert.Equal(t, [3]int{1, 2, 3}, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[3]*int", func(t *testing.T) {
+		x := [3]*int{intPtr(1), intPtr(2), intPtr(3)}
+		got, err := DeepCopy(x)
+		assert.Equal(t, [3]*int{intPtr(1), intPtr(2), intPtr(3)}, got)
+		assertNotSame(t, x, got)
+		assert.NoError(t, err)
+	})
+	t.Run("map[string]int", func(t *testing.T) {
+		x := map[string]int{"a": 1, "b": 2, "c": 3}
+		got, err := DeepCopy(x)
+		assert.Equal(t, map[string]int{"a": 1, "b": 2, "c": 3}, got)
+		assert.NoError(t, err)
+	})
+	t.Run("map[string]*int", func(t *testing.T) {
+		x := map[string]*int{"a": intPtr(1), "b": intPtr(2), "c": intPtr(3)}
+		got, err := DeepCopy(x)
+		assert.Equal(t, map[string]*int{"a": intPtr(1), "b": intPtr(2), "c": intPtr(3)}, got)
+		assertNotSame(t, x, got)
+		assert.NoError(t, err)
+	})
+	t.Run("struct", func(t *testing.T) {
+		type foo struct {
+			FieldInt    int
+			FieldIntPtr *int
+			FieldString string
+			FieldSlice  []int
+			FieldMap    map[string]int
+		}
+		x := &foo{
+			FieldInt:    123,
+			FieldIntPtr: intPtr(123),
+			FieldString: "abc",
+			FieldSlice:  []int{1, 2, 3},
+			FieldMap:    map[string]int{"a": 1, "b": 2, "c": 3},
+		}
+		got, err := DeepCopy(x)
+		assert.Equal(t, &foo{
+			FieldInt:    123,
+			FieldIntPtr: intPtr(123),
+			FieldString: "abc",
+			FieldSlice:  []int{1, 2, 3},
+			FieldMap:    map[string]int{"a": 1, "b": 2, "c": 3},
+		}, got)
+		assertNotSame(t, x, got)
+		assert.NoError(t, err)
+	})
+	t.Run("with type copier", func(t *testing.T) {
+		got, err := DeepCopy("abc", WithTypeCopier(reflect.TypeOf(""), func(v reflect.Value) (reflect.Value, error) {
+			return reflect.ValueOf("def"), nil
+		}))
+		assert.Equal(t, "def", got)
+		assert.NoError(t, err)
+	})
+	t.Run("type mismatch", func(t *testing.T) {
+		got, err := DeepCopy("abc", WithTypeCopier(reflect.TypeOf(""), func(v reflect.Value) (reflect.Value, error) {
+			return reflect.ValueOf(123), nil
+		}))
+		assert.Equal(t, "", got)
+		assert.EqualError(t, err, "cannot convert int to string")
+	})
+	t.Run("generic error", func(t *testing.T) {
+		got, err := DeepCopy("abc", withMockDeepCopyError)
+		assert.Equal(t, "", got)
+		assert.EqualError(t, err, "mock DeepCopy error")
+	})
 }
 
 func TestMustDeepCopy(t *testing.T) {
@@ -152,20 +141,5 @@ func TestMustDeepCopy(t *testing.T) {
 	assert.NotSame(t, input, copied)
 	assert.PanicsWithError(t, "mock DeepCopy error", func() {
 		MustDeepCopy("abc", withMockDeepCopyError)
-	})
-}
-
-func TestNewDeepCopyFunc(t *testing.T) {
-	t.Run("with generic option", func(t *testing.T) {
-		called := false
-		opt := func(c *coalescer) {
-			called = true
-		}
-		NewDeepCopyFunc(opt)
-		assert.True(t, called)
-	})
-	t.Run("generic error", func(t *testing.T) {
-		_, err := NewDeepCopyFunc(withMockDeepCopyError)(reflect.ValueOf(1))
-		assert.EqualError(t, err, "mock DeepCopy error")
 	})
 }

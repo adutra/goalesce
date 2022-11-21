@@ -306,7 +306,7 @@ func Test_coalescer_deepMergeStruct(t *testing.T) {
 			fieldMerger := func(v1, v2 reflect.Value) (reflect.Value, error) {
 				return reflect.ValueOf([]int{1, 2, 3}), nil
 			}
-			c := newCoalescer(WithFieldMergerProvider(reflect.TypeOf(foo{}), "FieldInts", func(parent DeepMergeFunc) DeepMergeFunc {
+			c := newCoalescer(WithFieldMergerProvider(reflect.TypeOf(foo{}), "FieldInts", func(DeepMergeFunc, DeepCopyFunc) DeepMergeFunc {
 				return fieldMerger
 			}))
 			got, err := c.deepMergeStruct(reflect.ValueOf(foo{FieldInts: []int{1, 2}}), reflect.ValueOf(foo{FieldInts: []int{2, 3}}))

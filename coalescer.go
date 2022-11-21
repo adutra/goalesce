@@ -54,14 +54,16 @@ func newCoalescer(opts ...Option) *coalescer {
 // created with default options. In the absence of a specific type merger, it merely delegates to
 // the appropriate specialized merge methods, depending on the type of the values to merge.
 func (c *coalescer) defaultDeepMerge(v1, v2 reflect.Value) (reflect.Value, error) {
-	if err := checkTypesMatch(v1, v2); err != nil {
+	if !v1.IsValid() {
+		return c.deepCopy(v2)
+	} else if !v2.IsValid() {
+		return c.deepCopy(v1)
+	}
+	if err := checkTypesMatch(v1.Type(), v2.Type()); err != nil {
 		return reflect.Value{}, err
 	}
 	if merger, found := c.typeMergers[v1.Type()]; found {
-		value, err := merger(v1, v2)
-		if value.IsValid() || err != nil {
-			return value, err
-		}
+		return merger(v1, v2)
 	}
 	switch v1.Type().Kind() {
 	case reflect.Interface:
@@ -84,11 +86,11 @@ func (c *coalescer) defaultDeepMerge(v1, v2 reflect.Value) (reflect.Value, error
 // created with default options. In the absence of a specific type copier, it merely delegates to
 // the appropriate specialized copy methods, depending on the type of the values to copy.
 func (c *coalescer) defaultDeepCopy(v reflect.Value) (reflect.Value, error) {
+	if !v.IsValid() {
+		return v, nil
+	}
 	if copier, found := c.typeCopiers[v.Type()]; found {
-		value, err := copier(v)
-		if value.IsValid() || err != nil {
-			return value, err
-		}
+		return copier(v)
 	}
 	switch v.Type().Kind() {
 	case reflect.Interface:

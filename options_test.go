@@ -71,6 +71,23 @@ func TestWithTypeCopier(t *testing.T) {
 	assert.True(t, called)
 }
 
+func TestWithTypeCopierProvider(t *testing.T) {
+	called := 0
+	c := newCoalescer(
+		WithTypeCopierProvider(reflect.TypeOf(map[string]int{}), func(DeepCopyFunc) DeepCopyFunc {
+			called++
+			return func(v reflect.Value) (reflect.Value, error) {
+				called++
+				return v, nil
+			}
+		}))
+	assert.NotNil(t, c.typeCopiers[reflect.TypeOf(map[string]int{})])
+	got, err := c.deepCopy(reflect.ValueOf(map[string]int{"a": 1}))
+	assert.Equal(t, map[string]int{"a": 1}, got.Interface())
+	assert.NoError(t, err)
+	assert.Equal(t, 2, called)
+}
+
 func TestWithAtomicMerge(t *testing.T) {
 	c := newCoalescer(WithAtomicMerge(reflect.TypeOf(map[string]int{})))
 	assert.NotNil(t, c.typeMergers[reflect.TypeOf(map[string]int{})])
@@ -104,7 +121,7 @@ func TestWithTypeMerger(t *testing.T) {
 func TestWithTypeMergerProvider(t *testing.T) {
 	called := 0
 	c := newCoalescer(
-		WithTypeMergerProvider(reflect.TypeOf(map[string]int{}), func(parent DeepMergeFunc) DeepMergeFunc {
+		WithTypeMergerProvider(reflect.TypeOf(map[string]int{}), func(DeepMergeFunc, DeepCopyFunc) DeepMergeFunc {
 			called++
 			return func(v1, v2 reflect.Value) (reflect.Value, error) {
 				called++
@@ -141,7 +158,7 @@ func TestWithFieldMergerProvider(t *testing.T) {
 	}
 	called := 0
 	c := newCoalescer(
-		WithFieldMergerProvider(reflect.TypeOf(User{}), "ID", func(parent DeepMergeFunc) DeepMergeFunc {
+		WithFieldMergerProvider(reflect.TypeOf(User{}), "ID", func(DeepMergeFunc, DeepCopyFunc) DeepMergeFunc {
 			called++
 			return func(v1, v2 reflect.Value) (reflect.Value, error) {
 				called++

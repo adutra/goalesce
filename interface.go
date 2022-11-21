@@ -20,9 +20,6 @@ func (c *coalescer) deepMergeInterface(v1, v2 reflect.Value) (reflect.Value, err
 	if value, done := checkZero(v1, v2); done {
 		return c.deepCopy(value)
 	}
-	if err := checkTypesMatch(v1.Elem(), v2.Elem()); err != nil {
-		return reflect.Value{}, err
-	}
 	coalesced := reflect.New(v1.Type())
 	coalescedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
 	if err != nil {

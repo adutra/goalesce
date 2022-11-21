@@ -14,43 +14,29 @@
 
 package goalesce
 
-import "reflect"
+import (
+	"reflect"
+)
 
 // DeepCopy deep-copies the value and returns the copied value.
 //
 // This function never modifies its inputs. It always returns an entirely newly-allocated value that
 // shares no references with the inputs.
-func DeepCopy(o interface{}, opts ...Option) (copied interface{}, err error) {
-	if o == nil {
-		return nil, nil
-	}
-	deepCopy := NewDeepCopyFunc(opts...)
+func DeepCopy[T any](o T, opts ...Option) (T, error) {
+	coalescer := newCoalescer(opts...)
 	v := reflect.ValueOf(o)
-	result, err := deepCopy(v)
-	if err != nil {
-		return nil, err
+	result, err := coalescer.deepCopy(v)
+	if !result.IsValid() || err != nil {
+		return zero[T](), err
 	}
-	return result.Interface(), nil
+	return cast[T](result)
 }
 
 // MustDeepCopy is like DeepCopy, but panics if the copy returns an error.
-func MustDeepCopy(o interface{}, opts ...Option) interface{} {
+func MustDeepCopy[T any](o T, opts ...Option) T {
 	copied, err := DeepCopy(o, opts...)
 	if err != nil {
 		panic(err)
 	}
 	return copied
-}
-
-// DeepCopyFunc is the main function for copying objects. Simple usages of this package do not need
-// to implement this function. Implementing this function is considered an advanced usage. A deep
-// copy function copies the given value to a newly-allocated value, avoiding retaining references to
-// passed objects. Note that the passed values can be zero-values, but will never be invalid values.
-// When a deep copy function returns an invalid value and a nil error, it is assumed that the
-// function is delegating the copy to its parent, if any.
-type DeepCopyFunc func(v reflect.Value) (reflect.Value, error)
-
-// NewDeepCopyFunc creates a new DeepCopyFunc with the given options.
-func NewDeepCopyFunc(opts ...Option) DeepCopyFunc {
-	return newCoalescer(opts...).deepCopy
 }

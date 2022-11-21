@@ -14,7 +14,9 @@
 
 package goalesce
 
-import "reflect"
+import (
+	"reflect"
+)
 
 // DeepMerge merges the 2 values and returns the merged value.
 //
@@ -40,40 +42,22 @@ import "reflect"
 //
 // This function returns an error if the values are not of the same type, or if the merge encounters
 // an error.
-func DeepMerge(o1, o2 interface{}, opts ...Option) (merged interface{}, err error) {
-	if o1 == nil {
-		return o2, nil
-	} else if o2 == nil {
-		return o1, nil
-	}
-	deepMerge := NewDeepMergeFunc(opts...)
+func DeepMerge[T any](o1, o2 T, opts ...Option) (T, error) {
 	v1 := reflect.ValueOf(o1)
 	v2 := reflect.ValueOf(o2)
-	result, err := deepMerge(v1, v2)
-	if err != nil {
-		return nil, err
+	coalescer := newCoalescer(opts...)
+	result, err := coalescer.deepMerge(v1, v2)
+	if !result.IsValid() || err != nil {
+		return zero[T](), err
 	}
-	return result.Interface(), nil
+	return cast[T](result)
 }
 
 // MustDeepMerge is like DeepMerge, but panics if the merge returns an error.
-func MustDeepMerge(o1, o2 interface{}, opts ...Option) interface{} {
+func MustDeepMerge[T any](o1, o2 T, opts ...Option) T {
 	merged, err := DeepMerge(o1, o2, opts...)
 	if err != nil {
 		panic(err)
 	}
 	return merged
-}
-
-// DeepMergeFunc is the main function for merging objects. Simple usages of this package do not need
-// to implement this function. Implementing this function is considered an advanced usage. A deep
-// merge function merges the 2 values into a single value, favoring v2 over v1 in case of conflicts.
-// Note that the passed values can be zero-values, but will never be invalid values. When a deep
-// merge function returns an invalid value and a nil error, it is assumed that the function is
-// delegating the merge to its parent, if any.
-type DeepMergeFunc func(v1, v2 reflect.Value) (reflect.Value, error)
-
-// NewDeepMergeFunc creates a new DeepMergeFunc with the given options.
-func NewDeepMergeFunc(opts ...Option) DeepMergeFunc {
-	return newCoalescer(opts...).deepMerge
 }

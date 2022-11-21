@@ -21,6 +21,34 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_zero(t *testing.T) {
+	assert.Equal(t, 0, zero[int]())
+	assert.Equal(t, "", zero[string]())
+	assert.Equal(t, false, zero[bool]())
+	type foo struct {
+		A int
+		B *int
+		C *foo
+	}
+	assert.Equal(t, foo{}, zero[foo]())
+	assert.Equal(t, (*int)(nil), zero[*int]())
+	assert.Equal(t, []int(nil), zero[[]int]())
+	assert.Equal(t, map[string]int(nil), zero[map[string]int]())
+}
+
+func Test_cast(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		got, err := cast[int](reflect.ValueOf(123))
+		assert.Equal(t, 123, got)
+		assert.NoError(t, err)
+	})
+	t.Run("error", func(t *testing.T) {
+		got, err := cast[int](reflect.ValueOf("abc"))
+		assert.Equal(t, 0, got)
+		assert.EqualError(t, err, "cannot convert string to int")
+	})
+}
+
 func Test_indirect(t *testing.T) {
 	tests := []struct {
 		name string
@@ -99,20 +127,20 @@ func Test_checkZero(t *testing.T) {
 func Test_checkTypesMatch(t *testing.T) {
 	tests := []struct {
 		name    string
-		v1      reflect.Value
-		v2      reflect.Value
+		v1      reflect.Type
+		v2      reflect.Type
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "same type",
-			v1:      reflect.ValueOf(0),
-			v2:      reflect.ValueOf(0),
+			v1:      reflect.TypeOf(0),
+			v2:      reflect.TypeOf(1),
 			wantErr: assert.NoError,
 		},
 		{
 			name: "different type",
-			v1:   reflect.ValueOf(0),
-			v2:   reflect.ValueOf("abc"),
+			v1:   reflect.TypeOf(0),
+			v2:   reflect.TypeOf("abc"),
 			wantErr: func(t assert.TestingT, err error, args ...interface{}) bool {
 				return assert.EqualError(t, err, "types do not match: int != string")
 			},
@@ -120,8 +148,6 @@ func Test_checkTypesMatch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, b := checkZero(tt.v1, tt.v2)
-			println(b)
 			err := checkTypesMatch(tt.v1, tt.v2)
 			tt.wantErr(t, err)
 		})

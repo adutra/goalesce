@@ -163,15 +163,17 @@ func Test_coalescer_deepMergeStruct(t *testing.T) {
 		}
 		type bar struct {
 			FieldInts            []int
-			FieldIntsAtomic      []int `goalesce:"atomic"`
-			FieldIntsUnion       []int `goalesce:"union"`
-			FieldIntsAppend      []int `goalesce:"append"`
-			FieldIntsIndex       []int `goalesce:"index"`
+			FieldIntsAtomic      []int  `goalesce:"atomic"`
+			FieldIntsUnion       []int  `goalesce:"union"`
+			FieldIntsAppend      []int  `goalesce:"append"`
+			FieldIntsIndex       []int  `goalesce:"index"`
+			FieldIntsIndexArray  [3]int `goalesce:"index"`
 			FieldFoos            []foo
 			FieldFoosAtomic      []foo    `goalesce:"atomic"`
 			FieldFoosUnion       []foo    `goalesce:"union"`
 			FieldFoosAppend      []foo    `goalesce:"append"`
 			FieldFoosIndex       []foo    `goalesce:"index"`
+			FieldFoosIndexArray  [3]foo   `goalesce:"index"`
 			FieldFoosMergeKey    []foo    `goalesce:"id:FieldInt"`
 			FieldFooPtrsMergeKey []*foo   `goalesce:"id:FieldIntPtr"`
 			FieldNestedSlice     []nested `goalesce:"id:FieldKey"`
@@ -213,6 +215,12 @@ func Test_coalescer_deepMergeStruct(t *testing.T) {
 				bar{FieldIntsIndex: []int{-1, -2, 3}},
 			},
 			{
+				"array ints index",
+				bar{FieldIntsIndexArray: [3]int{1, 2, 3}},
+				bar{FieldIntsIndexArray: [3]int{-1, -2}},
+				bar{FieldIntsIndexArray: [3]int{-1, -2, 3}},
+			},
+			{
 				"slice foos default",
 				bar{FieldFoos: []foo{{FieldInt: 1}, {FieldInt: 2}}},
 				bar{FieldFoos: []foo{{FieldInt: 2}, {FieldInt: 3}}},
@@ -241,6 +249,12 @@ func Test_coalescer_deepMergeStruct(t *testing.T) {
 				bar{FieldFoosIndex: []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}}},
 				bar{FieldFoosIndex: []foo{{FieldInt: -1}, {FieldInt: -2}}},
 				bar{FieldFoosIndex: []foo{{FieldInt: -1}, {FieldInt: -2}, {FieldInt: 3}}},
+			},
+			{
+				"array foos index",
+				bar{FieldFoosIndexArray: [3]foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}}},
+				bar{FieldFoosIndexArray: [3]foo{{FieldInt: -1}, {FieldInt: -2}}},
+				bar{FieldFoosIndexArray: [3]foo{{FieldInt: -1}, {FieldInt: -2}, {FieldInt: 3}}},
 			},
 			{
 				"slice foos merge key",
@@ -420,7 +434,7 @@ func Test_coalescer_deepMergeStruct(t *testing.T) {
 				"unknown strategy",
 				unknownStrategy{FieldInts: []int{1, 2}},
 				unknownStrategy{FieldInts: []int{2, 3}},
-				"field goalesce.unknownStrategy.FieldInts: unknown coalesce strategy: unknown",
+				"field goalesce.unknownStrategy.FieldInts: unknown merge strategy: unknown",
 			},
 			{
 				"invalid append",
@@ -438,7 +452,7 @@ func Test_coalescer_deepMergeStruct(t *testing.T) {
 				"invalid index",
 				invalidIndex{FieldInt: 1},
 				invalidIndex{FieldInt: 2},
-				"field goalesce.invalidIndex.FieldInt: index strategy is only supported for slices",
+				"field goalesce.invalidIndex.FieldInt: index strategy is only supported for slices and arrays",
 			},
 			{
 				"invalid merge",

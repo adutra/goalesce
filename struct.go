@@ -107,7 +107,7 @@ func (c *coalescer) fieldMergerFromTag(structType reflect.Type, field reflect.St
 	case strings.HasPrefix(mergeStrategy, MergeStrategyID):
 		return c.idFieldMerger(structType, field, mergeStrategy)
 	}
-	return nil, fmt.Errorf("field %s.%s: unknown coalesce strategy: %s", structType.String(), field.Name, mergeStrategy)
+	return nil, fmt.Errorf("field %s.%s: unknown merge strategy: %s", structType.String(), field.Name, mergeStrategy)
 }
 
 func (c *coalescer) appendFieldMerger(structType reflect.Type, field reflect.StructField) (DeepMergeFunc, error) {
@@ -127,12 +127,18 @@ func (c *coalescer) unionFieldMerger(structType reflect.Type, field reflect.Stru
 }
 
 func (c *coalescer) indexFieldMerger(structType reflect.Type, field reflect.StructField) (DeepMergeFunc, error) {
-	if field.Type.Kind() != reflect.Slice {
-		return nil, fmt.Errorf("field %s.%s: %s strategy is only supported for slices", structType.String(), field.Name, MergeStrategyIndex)
+	switch field.Type.Kind() {
+	case reflect.Slice:
+		return func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return c.deepMergeSliceWithMergeKey(v1, v2, SliceIndex)
+		}, nil
+	case reflect.Array:
+		return func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return c.deepMergeArrayByIndex(v1, v2)
+		}, nil
+	default:
+		return nil, fmt.Errorf("field %s.%s: %s strategy is only supported for slices and arrays", structType.String(), field.Name, MergeStrategyIndex)
 	}
-	return func(v1, v2 reflect.Value) (reflect.Value, error) {
-		return c.deepMergeSliceWithMergeKey(v1, v2, SliceIndex)
-	}, nil
 }
 
 func (c *coalescer) idFieldMerger(structType reflect.Type, field reflect.StructField, strategy string) (DeepMergeFunc, error) {

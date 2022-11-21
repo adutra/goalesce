@@ -69,7 +69,7 @@ The copied struct is a newly-allocated object; the struct fields are deep-copied
 
 ```go
 type User struct {
-    Id   int
+    ID   int
     Name string
 }
 v = User{ID: 1, Name: "Alice"}
@@ -93,7 +93,7 @@ fmt.Printf("DeepCopy(%+v) = %+v, %p != %p\n", v, copied, v, copied)
 
 Output:
 
-    DeepCopy(&{ID:1 Name:Alice Age:0}) = &{ID:1 Name:Alice Age:0}
+    DeepCopy(&{ID:1 Name:Alice}) = &{ID:1 Name:Alice}, 0xc00000e2a0 != 0xc00000e2d0
 
 ### Copying maps
 
@@ -107,7 +107,7 @@ fmt.Printf("DeepCopy(%+v) = %+v, %p != %p\n", v, copied, v, copied)
 
 Output:
 
-    DeepCopy(map[1:a 2:b]) = map[1:a 2:b]
+    DeepCopy(map[1:a 2:b]) = map[1:a 2:b], 0xc000101470 != 0xc0001015c0
 
 ### Copying slices
 
@@ -121,7 +121,7 @@ fmt.Printf("DeepCopy(%+v) = %+v, %p != %p\n", v, copied, v, copied)
 
 Output:
 
-    DeepCopy([1 2]) = [1 2]
+    DeepCopy([1 2]) = [1 2], 0xc000018b90 != 0xc000018ba0
 
 ### Custom copiers
 
@@ -196,8 +196,8 @@ Output:
 
 ### Merging slices and arrays
 
-When both slices or arrays are non-zero-values, the default behavior is to apply atomic semantics, that is, to
-_replace_ the first slice with the second one:
+When both slices or arrays are non-zero-values, the default behavior is to apply atomic semantics,
+that is, to _replace_ the first slice with the second one:
 
 ```go
 v1 := []int{1, 2}
@@ -350,22 +350,22 @@ The "merge-by-key" strategy can be used to merge two slices together using an ar
 
 ```go
 type User struct {
-    Id   int
+    ID   int
     Name string
     Age  int
 }
 mergeKeyFunc := func(_ int, v reflect.Value) (reflect.Value, error) {
-    return v.FieldByName("Id"), nil
+    return v.FieldByName("ID"), nil
 }
-v1 := []User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
-v2 := []User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
+v1 := []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
+v2 := []User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
 merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithMergeByKeyFunc(reflect.TypeOf(User{}), mergeKeyFunc))
 fmt.Printf("DeepMerge(%+v, %+v) = %+v\n", v1, v2, merged)
 ```
 
 Output:
 
-    DeepMerge([{Id:1 Name:Alice Age:0} {Id:2 Name:Bob Age:0}], [{Id:2 Name: Age:30} {Id:1 Name: Age:20}]) = [{Id:1 Name:Alice Age:20} {Id:2 Name:Bob Age:30}]
+    DeepMerge([{ID:1 Name:Alice Age:0} {ID:2 Name:Bob Age:0}], [{ID:2 Name: Age:30} {ID:1 Name: Age:20}]) = [{ID:1 Name:Alice Age:20} {ID:2 Name:Bob Age:30}]
 
 This strategy is similar to Kubernetes' [strategic merge patch].
 
@@ -377,22 +377,22 @@ name of a primary key field. In this case, we can use the `WithMergeByID` option
 field name to use as merge key, and simplify the example above as follows:
 
 ```go
-v1 := []User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
-v2 := []User{{Id: 1, Age: 20}      , {Id: 2, Age: 30}}
-merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithMergeByID(reflect.TypeOf(User{}), "Id"))
+v1 := []User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
+v2 := []User{{ID: 1, Age: 20}      , {ID: 2, Age: 30}}
+merged, _ := goalesce.DeepMerge(v1, v2, goalesce.WithMergeByID(reflect.TypeOf(User{}), "ID"))
 fmt.Printf("DeepMerge(%+v, %+v, MergeByID) = %+v\n", v1, v2, merged)
 ```
 
 Output:
 
-    DeepMerge([{Id:1 Name:Alice} {Id:2 Name:Bob}], [{Id:1 Age:20} {Id:2 Age:30}], MergeByID) = [{Id:1 Name:Alice Age:20} {Id:2 Name:Bob Age:30}]
+    DeepMerge([{ID:1 Name:Alice} {ID:2 Name:Bob}], [{ID:1 Age:20} {ID:2 Age:30}], MergeByID) = [{ID:1 Name:Alice Age:20} {ID:2 Name:Bob Age:30}]
 
 The option `WithMergeByID` also works out-of-the-box on slices of pointers to structs:
 
 ```go
-v1 := []*User{{Id: 1, Name: "Alice"}, {Id: 2, Name: "Bob"}}
-v2 := []*User{{Id: 2, Age: 30}, {Id: 1, Age: 20}}
-merged, _ = goalesce.DeepMerge(v1, v2, goalesce.WithMergeByID(reflect.TypeOf(User{}), "Id"))
+v1 := []*User{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Bob"}}
+v2 := []*User{{ID: 2, Age: 30}, {ID: 1, Age: 20}}
+merged, _ = goalesce.DeepMerge(v1, v2, goalesce.WithMergeByID(reflect.TypeOf(User{}), "ID"))
 jsn, _ := json.MarshalIndent(merged, "", "  ")
 fmt.Println(string(jsn))
 ```
@@ -402,12 +402,12 @@ Output:
 ```json
 [
   {
-    "Id": 1,
+    "ID": 1,
     "Name": "Alice",
     "Age": 20
   },
   {
-    "Id": 2,
+    "ID": 2,
     "Name": "Bob",
     "Age": 30
   }
@@ -423,19 +423,19 @@ field, recursively merging their values.
 
 ```go
 type User struct {
-    Id   int
+    ID   int
     Name string
     Age  int
 }
-v1 := User{Id: 1, Name: "Alice"}
-v2 := User{Id: 1, Age: 20}
+v1 := User{ID: 1, Name: "Alice"}
+v2 := User{ID: 1, Age: 20}
 merged, _ := goalesce.DeepMerge(v1, v2)
 fmt.Printf("DeepMerge(%+v, %+v) = %+v\n", v1, v2, merged)
 ```
 
 Output:
 
-    DeepMerge({Id:1 Name:Alice}, {Id:1 Age:20}) = {Id:1 Name:Alice Age:20}
+    DeepMerge({ID:1 Name:Alice}, {ID:1 Age:20}) = {ID:1 Name:Alice Age:20}
 
 #### Per-field merging strategies
 
@@ -453,20 +453,20 @@ The struct tag `goalesce` allows to specify the following per-field strategies:
 | `id`     | Slice of struct fields | Applies "merge-by-id" semantics.    |   
 
 With the `id` strategy, a merge key must also be provided, separated by a colon from the strategy
-name itself, e.g. `goalesce:"id:Id"`.  The merge key _must_ be the name of an exported field in the
+name itself, e.g. `goalesce:"id:ID"`.  The merge key _must_ be the name of an exported field in the
 slice's struct element type.
 
 Example:
 
 ```go
 type Actor struct {
-    Id   int
+    ID   int
     Name string
 }
 type Movie struct {
     Name        string
     Description string
-    Actors      []Actor           `goalesce:"id:Id"`
+    Actors      []Actor           `goalesce:"id:ID"`
     Tags        []string          `goalesce:"union"`
     Labels      map[string]string `goalesce:"atomic"`
 }
@@ -474,9 +474,9 @@ v1 = Movie{
     Name:        "The Matrix",
     Description: "A computer hacker learns from mysterious rebels about the true nature of his reality and his role in the war against its controllers.",
     Actors: []Actor{
-        {Id: 1, Name: "Keanu Reeves"},
-        {Id: 2, Name: "Laurence Fishburne"},
-        {Id: 3, Name: "Carrie-Anne Moss"},
+        {ID: 1, Name: "Keanu Reeves"},
+        {ID: 2, Name: "Laurence Fishburne"},
+        {ID: 3, Name: "Carrie-Anne Moss"},
     },
     Tags: []string{"sci-fi", "action"},
     Labels: map[string]string{
@@ -486,9 +486,9 @@ v1 = Movie{
 v2 = Movie{
     Name: "The Matrix",
     Actors: []Actor{
-        {Id: 2, Name: "Laurence Fishburne"},
-        {Id: 3, Name: "Carrie-Anne Moss"},
-        {Id: 4, Name: "Hugo Weaving"},
+        {ID: 2, Name: "Laurence Fishburne"},
+        {ID: 3, Name: "Carrie-Anne Moss"},
+        {ID: 4, Name: "Hugo Weaving"},
     },
     Tags: []string{"action", "fantasy"},
     Labels: map[string]string{
@@ -508,19 +508,19 @@ Output:
   "Description": "A computer hacker learns from mysterious rebels about the true nature of his reality and his role in the war against its controllers.",
   "Actors": [
     {
-      "Id": 1,
+      "ID": 1,
       "Name": "Keanu Reeves"
     },
     {
-      "Id": 2,
+      "ID": 2,
       "Name": "Laurence Fishburne"
     },
     {
-      "Id": 3,
+      "ID": 3,
       "Name": "Carrie-Anne Moss"
     },
     {
-      "Id": 4,
+      "ID": 4,
       "Name": "Hugo Weaving"
     }
   ],

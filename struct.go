@@ -20,110 +20,137 @@ import (
 	"strings"
 )
 
-// CoalesceStrategyTag is the struct tag used to specify the coalescing strategy to use for a struct field.
-const CoalesceStrategyTag = "goalesce"
+// MergeStrategyTag is the struct tag used to specify the merge strategy to use for a struct field.
+const MergeStrategyTag = "goalesce"
 
 const (
-	// CoalesceStrategyAtomic applies "atomic" semantics.
-	CoalesceStrategyAtomic = "atomic"
-	// CoalesceStrategyAppend applies "list-append" semantics.
-	CoalesceStrategyAppend = "append"
-	// CoalesceStrategyUnion applies "set-union" semantics.
-	CoalesceStrategyUnion = "union"
-	// CoalesceStrategyIndex applies "merge-by-index" semantics.
-	CoalesceStrategyIndex = "index"
-	// CoalesceStrategyMerge applies "merge-by-key" semantics.
-	CoalesceStrategyMerge = "merge"
+	// MergeStrategyAtomic applies "atomic" semantics.
+	MergeStrategyAtomic = "atomic"
+	// MergeStrategyAppend applies "list-append" semantics.
+	MergeStrategyAppend = "append"
+	// MergeStrategyUnion applies "set-union" semantics.
+	MergeStrategyUnion = "union"
+	// MergeStrategyIndex applies "merge-by-index" semantics.
+	MergeStrategyIndex = "index"
+	// MergeStrategyID applies "merge-by-id" semantics.
+	MergeStrategyID = "id"
 )
 
-func (c *mainCoalescer) coalesceStruct(v1, v2 reflect.Value) (reflect.Value, error) {
-	coalesced := reflect.New(v1.Type()).Elem()
+func (c *coalescer) deepMergeStruct(v1, v2 reflect.Value) (reflect.Value, error) {
+	if value, done := checkZero(v1, v2); done {
+		return c.deepCopy(value)
+	}
+	merged := reflect.New(v1.Type()).Elem()
 	for i := 0; i < v1.NumField(); i++ {
 		field := v1.Type().Field(i)
 		if field.IsExported() {
-			if fieldCoalescer, err := c.fieldCoalescer(v1.Type(), field); err != nil {
+			if fieldMerger, err := c.fieldMerger(v1.Type(), field); err != nil {
 				return reflect.Value{}, err
-			} else if coalescedField, err := fieldCoalescer(v1.Field(i), v2.Field(i)); err != nil {
+			} else if mergedField, err := fieldMerger(v1.Field(i), v2.Field(i)); err != nil {
 				return reflect.Value{}, err
 			} else {
-				coalesced.Field(i).Set(coalescedField)
+				merged.Field(i).Set(mergedField)
 			}
 		}
 	}
-	return coalesced, nil
+	return merged, nil
 }
 
-func (c *mainCoalescer) fieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
-	fieldCoalescer, err := c.fieldCoalescerFromTag(structType, field)
+func (c *coalescer) deepCopyStruct(v reflect.Value) (reflect.Value, error) {
+	if v.IsZero() {
+		return reflect.Zero(v.Type()), nil
+	}
+	copied := reflect.New(v.Type()).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Type().Field(i)
+		if field.IsExported() {
+			copiedField, err := c.deepCopy(v.Field(i))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			copied.Field(i).Set(copiedField)
+		}
+	}
+	return copied, nil
+}
+
+func (c *coalescer) fieldMerger(structType reflect.Type, field reflect.StructField) (DeepMergeFunc, error) {
+	fieldMerger, err := c.fieldMergerFromTag(structType, field)
 	if err != nil {
 		return nil, err
 	}
-	if fieldCoalescer == nil {
-		if fieldCoalescers, found := c.fieldCoalescers[structType]; found {
-			fieldCoalescer = fieldCoalescers[field.Name]
+	if fieldMerger == nil {
+		if fieldMergers, found := c.fieldMergers[structType]; found {
+			fieldMerger = fieldMergers[field.Name]
 		}
 	}
-	if fieldCoalescer == nil {
-		fieldCoalescer = c.coalesce
+	if fieldMerger == nil {
+		fieldMerger = c.deepMerge
 	}
-	return fieldCoalescer, nil
+	return fieldMerger, nil
 }
 
-func (c *mainCoalescer) fieldCoalescerFromTag(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
-	coalesceStrategy, found := field.Tag.Lookup(CoalesceStrategyTag)
+func (c *coalescer) fieldMergerFromTag(structType reflect.Type, field reflect.StructField) (DeepMergeFunc, error) {
+	mergeStrategy, found := field.Tag.Lookup(MergeStrategyTag)
 	if !found {
 		return nil, nil
 	}
 	switch {
-	case coalesceStrategy == CoalesceStrategyAtomic:
-		return coalesceAtomic, nil
-	case coalesceStrategy == CoalesceStrategyAppend:
-		return c.appendFieldCoalescer(structType, field)
-	case coalesceStrategy == CoalesceStrategyUnion:
-		return c.unionFieldCoalescer(structType, field)
-	case coalesceStrategy == CoalesceStrategyIndex:
-		return c.indexFieldCoalescer(structType, field)
-	case strings.HasPrefix(coalesceStrategy, CoalesceStrategyMerge):
-		return c.mergeFieldCoalescer(structType, field, coalesceStrategy)
+	case mergeStrategy == MergeStrategyAtomic:
+		return c.deepMergeAtomic, nil
+	case mergeStrategy == MergeStrategyAppend:
+		return c.appendFieldMerger(structType, field)
+	case mergeStrategy == MergeStrategyUnion:
+		return c.unionFieldMerger(structType, field)
+	case mergeStrategy == MergeStrategyIndex:
+		return c.indexFieldMerger(structType, field)
+	case strings.HasPrefix(mergeStrategy, MergeStrategyID):
+		return c.idFieldMerger(structType, field, mergeStrategy)
 	}
-	return nil, fmt.Errorf("field %s.%s: unknown coalesce strategy: %s", structType.String(), field.Name, coalesceStrategy)
+	return nil, fmt.Errorf("field %s.%s: unknown merge strategy: %s", structType.String(), field.Name, mergeStrategy)
 }
 
-func (c *mainCoalescer) appendFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
+func (c *coalescer) appendFieldMerger(structType reflect.Type, field reflect.StructField) (DeepMergeFunc, error) {
 	if field.Type.Kind() != reflect.Slice {
-		return nil, fmt.Errorf("field %s.%s: append strategy is only supported for slices", structType.String(), field.Name)
+		return nil, fmt.Errorf("field %s.%s: %s strategy is only supported for slices", structType.String(), field.Name, MergeStrategyAppend)
 	}
-	return coalesceSliceAppend, nil
+	return c.deepMergeSliceWithListAppend, nil
 }
 
-func (c *mainCoalescer) unionFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
+func (c *coalescer) unionFieldMerger(structType reflect.Type, field reflect.StructField) (DeepMergeFunc, error) {
 	if field.Type.Kind() != reflect.Slice {
-		return nil, fmt.Errorf("field %s.%s: union strategy is only supported for slices", structType.String(), field.Name)
+		return nil, fmt.Errorf("field %s.%s: %s strategy is only supported for slices", structType.String(), field.Name, MergeStrategyUnion)
 	}
 	return func(v1, v2 reflect.Value) (reflect.Value, error) {
-		return c.coalesceSliceMerge(v1, v2, SliceUnion)
+		return c.deepMergeSliceWithMergeKey(v1, v2, SliceUnion)
 	}, nil
 }
 
-func (c *mainCoalescer) indexFieldCoalescer(structType reflect.Type, field reflect.StructField) (Coalescer, error) {
-	if field.Type.Kind() != reflect.Slice {
-		return nil, fmt.Errorf("field %s.%s: index strategy is only supported for slices", structType.String(), field.Name)
+func (c *coalescer) indexFieldMerger(structType reflect.Type, field reflect.StructField) (DeepMergeFunc, error) {
+	switch field.Type.Kind() {
+	case reflect.Slice:
+		return func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return c.deepMergeSliceWithMergeKey(v1, v2, SliceIndex)
+		}, nil
+	case reflect.Array:
+		return func(v1, v2 reflect.Value) (reflect.Value, error) {
+			return c.deepMergeArrayByIndex(v1, v2)
+		}, nil
+	default:
+		return nil, fmt.Errorf("field %s.%s: %s strategy is only supported for slices and arrays", structType.String(), field.Name, MergeStrategyIndex)
 	}
-	return func(v1, v2 reflect.Value) (reflect.Value, error) {
-		return c.coalesceSliceMerge(v1, v2, SliceIndex)
-	}, nil
 }
 
-func (c *mainCoalescer) mergeFieldCoalescer(structType reflect.Type, field reflect.StructField, strategy string) (Coalescer, error) {
+func (c *coalescer) idFieldMerger(structType reflect.Type, field reflect.StructField, strategy string) (DeepMergeFunc, error) {
 	if field.Type.Kind() != reflect.Slice {
-		return nil, fmt.Errorf("field %s.%s: merge strategy is only supported for slices", structType.String(), field.Name)
+		return nil, fmt.Errorf("field %s.%s: %s strategy is only supported for slices", structType.String(), field.Name, MergeStrategyID)
 	}
 	var key string
-	if i := strings.IndexRune(strategy, ','); i != -1 {
+	if i := strings.IndexRune(strategy, ':'); i != -1 {
 		key = strategy[i+1:]
 	}
 	if key == "" {
-		return nil, fmt.Errorf("field %s.%s: %s strategy must be followed by a comma and the merge key", structType.String(), field.Name, CoalesceStrategyMerge)
+		return nil, fmt.Errorf("field %s.%s: %s strategy must be followed by a colon and the merge key", structType.String(), field.Name, MergeStrategyID)
 	}
 	elemType := indirect(field.Type.Elem())
 	if elemType.Kind() != reflect.Struct {
@@ -132,7 +159,7 @@ func (c *mainCoalescer) mergeFieldCoalescer(structType reflect.Type, field refle
 		return nil, fmt.Errorf("field %s.%s: slice element type %s has no field named %s", structType.String(), field.Name, elemType.String(), key)
 	}
 	return func(v1, v2 reflect.Value) (reflect.Value, error) {
-		return c.coalesceSliceMerge(v1, v2, newMergeByField(key))
+		return c.deepMergeSliceWithMergeKey(v1, v2, newMergeByField(key))
 	}, nil
 }
 

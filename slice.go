@@ -39,9 +39,15 @@ var SliceIndex SliceMergeKeyFunc = func(index int, element reflect.Value) (key r
 	return reflect.ValueOf(index), nil
 }
 
-func (c *mainCoalescer) coalesceSlice(v1, v2 reflect.Value) (reflect.Value, error) {
+// deepMergeSlice is the default slice merger. It first checks if there is a custom slice merger
+// registered for the slice type. If there is, it uses it. Otherwise, it uses the default slice
+// merge strategy, which is atomic.
+func (c *coalescer) deepMergeSlice(v1, v2 reflect.Value) (reflect.Value, error) {
+	if value, done := checkZero(v1, v2); done {
+		return c.deepCopy(value)
+	}
 	if v1.Len() == 0 && v2.Len() == 0 {
-		return v2, nil
+		return c.deepCopy(v2)
 	}
 	if c.zeroEmptySlice {
 		if v1.Len() == 0 {
@@ -50,38 +56,65 @@ func (c *mainCoalescer) coalesceSlice(v1, v2 reflect.Value) (reflect.Value, erro
 		if v2.Len() == 0 {
 			v2 = reflect.Zero(v2.Type())
 		}
+		if value, done := checkZero(v1, v2); done {
+			return c.deepCopy(value)
+		}
 	}
-	if coalescer, found := c.sliceCoalescers[v1.Type()]; found {
-		return coalescer(v1, v2)
+	if sliceMerger, found := c.sliceMergers[v1.Type()]; found {
+		return sliceMerger(v1, v2)
 	}
-	if c.sliceCoalescer != nil {
-		return c.sliceCoalescer(v1, v2)
+	if c.sliceMerger != nil {
+		return c.sliceMerger(v1, v2)
 	}
-	return coalesceAtomic(v1, v2)
+	return c.deepMergeAtomic(v1, v2)
 }
 
-func coalesceSliceAppend(v1, v2 reflect.Value) (reflect.Value, error) {
+// deepMergeSliceWithListAppend is an alternate slice merger that appends the elements of the second
+// slice to the first slice. It is not the default merge strategy for slices; it is only activated
+// if a slice merger has been registered through one of the options:
+// WithDefaultSliceListAppendMerge, WithSliceListAppendMerge or WithFieldListAppendMerge.
+func (c *coalescer) deepMergeSliceWithListAppend(v1, v2 reflect.Value) (reflect.Value, error) {
 	if value, done := checkZero(v1, v2); done {
-		return value, nil
+		return c.deepCopy(value)
+	}
+	if v1.Len() == 0 && v2.Len() == 0 {
+		return c.deepCopy(v2)
 	}
 	l := v1.Len() + v2.Len()
 	coalesced := reflect.MakeSlice(v1.Type(), l, l)
 	for i := 0; i < v1.Len(); i++ {
-		coalesced.Index(i).Set(v1.Index(i))
+		elem, err := c.deepCopy(v1.Index(i))
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		coalesced.Index(i).Set(elem)
 	}
 	for i := 0; i < v2.Len(); i++ {
-		coalesced.Index(v1.Len() + i).Set(v2.Index(i))
+		elem, err := c.deepCopy(v2.Index(i))
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		coalesced.Index(v1.Len() + i).Set(elem)
 	}
 	return coalesced, nil
 }
 
 var typeOfInterface = reflect.TypeOf((*interface{})(nil)).Elem()
 
-func (c *mainCoalescer) coalesceSliceMerge(v1, v2 reflect.Value, mergeKeyFunc SliceMergeKeyFunc) (reflect.Value, error) {
+// deepMergeSliceWithMergeKey is an alternate slice merger that merges the elements of the two
+// slices using a merge key function. It is not the default merge strategy for slices; it is only
+// activated if a slice merger has been registered through one of the options:
+// WithDefaultSliceSetUnionMerge, WithDefaultSliceMergeByIndex, WithSliceSetUnionMerge,
+// WithSliceMergeByIndex, WithSliceMergeByID, WithSliceMergeByKeyFunc, WithFieldMergeByIndex,
+// WithFieldMergeByID, WithFieldMergeByKeyFunc.
+func (c *coalescer) deepMergeSliceWithMergeKey(v1, v2 reflect.Value, mergeKeyFunc SliceMergeKeyFunc) (reflect.Value, error) {
 	if value, done := checkZero(v1, v2); done {
-		return value, nil
+		return c.deepCopy(value)
 	}
-	// the keys slice allows to keep a deterministic element order in the resulting slice
+	if v1.Len() == 0 && v2.Len() == 0 {
+		return c.deepCopy(v2)
+	}
+	// The "keys" slice allows to keep a deterministic element order in the resulting slice.
 	keys := reflect.MakeSlice(reflect.SliceOf(typeOfInterface), 0, 0)
 	m1 := reflect.MakeMap(reflect.MapOf(typeOfInterface, v1.Type().Elem()))
 	for i := 0; i < v1.Len(); i++ {
@@ -111,9 +144,31 @@ func (c *mainCoalescer) coalesceSliceMerge(v1, v2 reflect.Value, mergeKeyFunc Sl
 		}
 		m2.SetMapIndex(k, v)
 	}
-	m, err := c.coalesce(m1, m2)
-	if err != nil {
-		return reflect.Value{}, err
+	// Note: we can't call deepMergeMap here because it is important to NOT copy the merge keys
+	m := reflect.MakeMap(m1.Type())
+	for _, k := range m1.MapKeys() {
+		if !m2.MapIndex(k).IsValid() {
+			copiedValue, err := c.deepCopy(m1.MapIndex(k))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			m.SetMapIndex(k, copiedValue)
+		}
+	}
+	for _, k := range m2.MapKeys() {
+		if m1.MapIndex(k).IsValid() {
+			coalescedValue, err := c.deepMerge(m1.MapIndex(k), m2.MapIndex(k))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			m.SetMapIndex(k, coalescedValue)
+		} else {
+			copiedValue, err := c.deepCopy(m2.MapIndex(k))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			m.SetMapIndex(k, copiedValue)
+		}
 	}
 	coalesced := reflect.MakeSlice(v1.Type(), 0, 0)
 	for i := 0; i < keys.Len(); i++ {
@@ -132,4 +187,19 @@ func checkMergeKey(k reflect.Value) error {
 		return fmt.Errorf("slice merge key %v of type %T is not comparable", k.Interface(), k.Interface())
 	}
 	return nil
+}
+
+func (c *coalescer) deepCopySlice(v reflect.Value) (reflect.Value, error) {
+	if v.IsZero() {
+		return reflect.Zero(v.Type()), nil
+	}
+	copied := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
+	for i := 0; i < v.Len(); i++ {
+		elem, err := c.deepCopy(v.Index(i))
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		copied.Index(i).Set(elem)
+	}
+	return copied, nil
 }

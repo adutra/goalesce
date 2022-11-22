@@ -15,15 +15,13 @@
 package goalesce
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func Test_mainCoalescer_coalesceMap(t *testing.T) {
+func Test_coalescer_deepMergeMap(t *testing.T) {
 	type foo struct {
 		FieldInt int
 	}
@@ -31,295 +29,447 @@ func Test_mainCoalescer_coalesceMap(t *testing.T) {
 		FieldIntPtr *int
 	}
 	tests := []struct {
-		name string
-		v1   interface{}
-		v2   interface{}
-		want interface{}
+		name    string
+		v1      interface{}
+		v2      interface{}
+		want    interface{}
+		wantErr assert.ErrorAssertionFunc
+		opts    []Option
 	}{
 		{
-			"map[string]int zero",
-			(map[string]int)(nil),
-			(map[string]int)(nil),
-			(map[string]int)(nil),
+			name: "map[string]int zero",
+			v1:   (map[string]int)(nil),
+			v2:   (map[string]int)(nil),
+			want: (map[string]int)(nil),
 		},
 		{
-			"map[string]int mixed zero",
-			map[string]int{"a": 1},
-			(map[string]int)(nil),
-			map[string]int{"a": 1},
+			name: "map[string]int mixed zero",
+			v1:   map[string]int{"a": 1},
+			v2:   (map[string]int)(nil),
+			want: map[string]int{"a": 1},
 		},
 		{
-			"map[string]int mixed zero2",
-			(map[string]int)(nil),
-			map[string]int{"b": 2},
-			map[string]int{"b": 2},
+			name: "map[string]int mixed zero2",
+			v1:   (map[string]int)(nil),
+			v2:   map[string]int{"b": 2},
+			want: map[string]int{"b": 2},
 		},
 		{
-			"map[string]int empty",
-			map[string]int{},
-			map[string]int{},
-			map[string]int{},
+			name: "map[string]int empty",
+			v1:   map[string]int{},
+			v2:   map[string]int{},
+			want: map[string]int{},
 		},
 		{
-			"map[string]int mixed empty",
-			map[string]int{"a": 1},
-			map[string]int{},
-			map[string]int{"a": 1},
+			name: "map[string]int mixed empty",
+			v1:   map[string]int{"a": 1},
+			v2:   map[string]int{},
+			want: map[string]int{"a": 1},
 		},
 		{
-			"map[string]int mixed empty 2",
-			map[string]int{},
-			map[string]int{"a": 2},
-			map[string]int{"a": 2},
+			name: "map[string]int mixed empty 2",
+			v1:   map[string]int{},
+			v2:   map[string]int{"a": 2},
+			want: map[string]int{"a": 2},
 		},
 		{
-			"map[string]int non empty",
-			map[string]int{"a": 1, "b": 1},
-			map[string]int{"a": 2, "c": 2},
-			map[string]int{"a": 2, "b": 1, "c": 2},
+			name: "map[string]int non empty",
+			v1:   map[string]int{"a": 1, "b": 1},
+			v2:   map[string]int{"a": 2, "c": 2},
+			want: map[string]int{"a": 2, "b": 1, "c": 2},
 		},
 		{
-			"map[string]foo zero",
-			(map[string]foo)(nil),
-			(map[string]foo)(nil),
-			(map[string]foo)(nil),
+			name: "map[string]foo zero",
+			v1:   (map[string]foo)(nil),
+			v2:   (map[string]foo)(nil),
+			want: (map[string]foo)(nil),
 		},
 		{
-			"map[string]foo empty",
-			map[string]foo{},
-			map[string]foo{},
-			map[string]foo{},
+			name: "map[string]foo empty",
+			v1:   map[string]foo{},
+			v2:   map[string]foo{},
+			want: map[string]foo{},
 		},
 		{
-			"map[string]foo mixed empty",
-			map[string]foo{"a": {1}},
-			map[string]foo{},
-			map[string]foo{"a": {1}},
+			name: "map[string]foo mixed empty",
+			v1:   map[string]foo{"a": {1}},
+			v2:   map[string]foo{},
+			want: map[string]foo{"a": {1}},
 		},
 		{
-			"map[string]foo mixed empty 2",
-			map[string]foo{},
-			map[string]foo{"b": {2}},
-			map[string]foo{"b": {2}},
+			name: "map[string]foo mixed empty 2",
+			v1:   map[string]foo{},
+			v2:   map[string]foo{"b": {2}},
+			want: map[string]foo{"b": {2}},
 		},
 		{
-			"map[string]foo non empty",
-			map[string]foo{"a": {1}, "b": {2}},
-			map[string]foo{"a": {2}, "c": {2}},
-			map[string]foo{"a": {2}, "b": {2}, "c": {2}},
+			name: "map[string]foo non empty",
+			v1:   map[string]foo{"a": {1}, "b": {2}},
+			v2:   map[string]foo{"a": {2}, "c": {2}},
+			want: map[string]foo{"a": {2}, "b": {2}, "c": {2}},
 		},
 		{
-			"map[string]*int zero",
-			(map[string]*int)(nil),
-			(map[string]*int)(nil),
-			(map[string]*int)(nil),
+			name: "map[string]*int zero",
+			v1:   (map[string]*int)(nil),
+			v2:   (map[string]*int)(nil),
+			want: (map[string]*int)(nil),
 		},
 		{
-			"map[string]*int mixed zero",
-			map[string]*int{"a": nil},
-			(map[string]*int)(nil),
-			map[string]*int{"a": nil},
+			name: "map[string]*int mixed zero",
+			v1:   map[string]*int{"a": nil},
+			v2:   (map[string]*int)(nil),
+			want: map[string]*int{"a": nil},
 		},
 		{
-			"map[string]*int mixed zero2",
-			(map[string]*int)(nil),
-			map[string]*int{"b": nil},
-			map[string]*int{"b": nil},
+			name: "map[string]*int mixed zero2",
+			v1:   (map[string]*int)(nil),
+			v2:   map[string]*int{"b": nil},
+			want: map[string]*int{"b": nil},
 		},
 		{
-			"map[string]*int empty",
-			map[string]*int{},
-			map[string]*int{},
-			map[string]*int{},
+			name: "map[string]*int empty",
+			v1:   map[string]*int{},
+			v2:   map[string]*int{},
+			want: map[string]*int{},
 		},
 		{
-			"map[string]*int mixed empty",
-			map[string]*int{"a": intPtr(1)},
-			map[string]*int{},
-			map[string]*int{"a": intPtr(1)},
+			name: "map[string]*int mixed empty",
+			v1:   map[string]*int{"a": intPtr(1)},
+			v2:   map[string]*int{},
+			want: map[string]*int{"a": intPtr(1)},
 		},
 		{
-			"map[string]*int mixed empty 2",
-			map[string]*int{},
-			map[string]*int{"a": intPtr(2)},
-			map[string]*int{"a": intPtr(2)},
+			name: "map[string]*int mixed empty 2",
+			v1:   map[string]*int{},
+			v2:   map[string]*int{"a": intPtr(2)},
+			want: map[string]*int{"a": intPtr(2)},
 		},
 		{
-			"map[string]*int mixed empty 3",
-			map[string]*int{"a": intPtr(1)},
-			map[string]*int{"a": nil},
-			map[string]*int{"a": intPtr(1)},
+			name: "map[string]*int mixed empty 3",
+			v1:   map[string]*int{"a": intPtr(1)},
+			v2:   map[string]*int{"a": nil},
+			want: map[string]*int{"a": intPtr(1)},
 		},
 		{
-			"map[string]*int mixed empty 4",
-			map[string]*int{"a": nil},
-			map[string]*int{"a": intPtr(2)},
-			map[string]*int{"a": intPtr(2)},
+			name: "map[string]*int mixed empty 4",
+			v1:   map[string]*int{"a": nil},
+			v2:   map[string]*int{"a": intPtr(2)},
+			want: map[string]*int{"a": intPtr(2)},
 		},
 		{
-			"map[string]*int non empty",
-			map[string]*int{"a": intPtr(1), "b": intPtr(1)},
-			map[string]*int{"a": intPtr(2), "c": nil},
-			map[string]*int{"a": intPtr(2), "b": intPtr(1), "c": nil},
+			name: "map[string]*int non empty",
+			v1:   map[string]*int{"a": intPtr(1), "b": intPtr(1)},
+			v2:   map[string]*int{"a": intPtr(2), "c": nil},
+			want: map[string]*int{"a": intPtr(2), "b": intPtr(1), "c": nil},
 		},
 		{
-			"map[string][]int empty",
-			map[string][]int{},
-			map[string][]int{},
-			map[string][]int{},
+			name: "map[string][]int empty",
+			v1:   map[string][]int{},
+			v2:   map[string][]int{},
+			want: map[string][]int{},
 		},
 		{
-			"map[string][]int mixed empty",
-			map[string][]int{"a": {1}},
-			map[string][]int{},
-			map[string][]int{"a": {1}},
+			name: "map[string][]int mixed empty",
+			v1:   map[string][]int{"a": {1}},
+			v2:   map[string][]int{},
+			want: map[string][]int{"a": {1}},
 		},
 		{
-			"map[string][]int mixed empty 2",
-			map[string][]int{},
-			map[string][]int{"a": {2}},
-			map[string][]int{"a": {2}},
+			name: "map[string][]int mixed empty 2",
+			v1:   map[string][]int{},
+			v2:   map[string][]int{"a": {2}},
+			want: map[string][]int{"a": {2}},
 		},
 		{
-			"map[string][]int mixed empty 3",
-			map[string][]int{"a": {1}},
-			map[string][]int{"a": nil},
-			map[string][]int{"a": {1}},
+			name: "map[string][]int mixed empty 3",
+			v1:   map[string][]int{"a": {1}},
+			v2:   map[string][]int{"a": nil},
+			want: map[string][]int{"a": {1}},
 		},
 		{
-			"map[string][]int mixed empty 4",
-			map[string][]int{"a": nil},
-			map[string][]int{"a": {2}},
-			map[string][]int{"a": {2}},
+			name: "map[string][]int mixed empty 4",
+			v1:   map[string][]int{"a": nil},
+			v2:   map[string][]int{"a": {2}},
+			want: map[string][]int{"a": {2}},
 		},
 		{
-			"map[string][]int non empty",
-			map[string][]int{"a": {1}, "b": {1}},
-			map[string][]int{"a": {1, 2}, "c": nil},
-			map[string][]int{"a": {1, 2}, "b": {1}, "c": nil},
+			name: "map[string][]int non empty",
+			v1:   map[string][]int{"a": {1}, "b": {1}},
+			v2:   map[string][]int{"a": {1, 2}, "c": nil},
+			want: map[string][]int{"a": {1, 2}, "b": {1}, "c": nil},
 		},
 		{
-			"map[string]*bar empty",
-			map[string]*bar{},
-			map[string]*bar{},
-			map[string]*bar{},
+			name: "map[string]*bar empty",
+			v1:   map[string]*bar{},
+			v2:   map[string]*bar{},
+			want: map[string]*bar{},
 		},
 		{
-			"map[string]*bar mixed empty",
-			map[string]*bar{"a": {intPtr(1)}},
-			map[string]*bar{},
-			map[string]*bar{"a": {intPtr(1)}},
+			name: "map[string]*bar mixed empty",
+			v1:   map[string]*bar{"a": {intPtr(1)}},
+			v2:   map[string]*bar{},
+			want: map[string]*bar{"a": {intPtr(1)}},
 		},
 		{
-			"map[string]*bar mixed empty 2",
-			map[string]*bar{},
-			map[string]*bar{"b": {intPtr(2)}},
-			map[string]*bar{"b": {intPtr(2)}},
+			name: "map[string]*bar mixed empty 2",
+			v1:   map[string]*bar{},
+			v2:   map[string]*bar{"b": {intPtr(2)}},
+			want: map[string]*bar{"b": {intPtr(2)}},
 		},
 		{
-			"map[string]*bar nested nils",
-			map[string]*bar{"a": {nil}, "b": nil},
-			map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
-			map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
+			name: "map[string]*bar nested nils",
+			v1:   map[string]*bar{"a": {nil}, "b": nil},
+			v2:   map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
+			want: map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
 		},
 		{
-			"map[string]*bar nested nils 2",
-			map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
-			map[string]*bar{"a": {nil}, "b": nil},
-			map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
+			name: "map[string]*bar nested nils 2",
+			v1:   map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
+			v2:   map[string]*bar{"a": {nil}, "b": nil},
+			want: map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
 		},
 		{
-			"map[string]*bar non empty",
-			map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
-			map[string]*bar{"a": {intPtr(2)}, "c": {intPtr(2)}},
-			map[string]*bar{"a": {intPtr(2)}, "b": {intPtr(2)}, "c": {intPtr(2)}},
+			name: "map[string]*bar non empty",
+			v1:   map[string]*bar{"a": {intPtr(1)}, "b": {intPtr(2)}},
+			v2:   map[string]*bar{"a": {intPtr(2)}, "c": {intPtr(2)}},
+			want: map[string]*bar{"a": {intPtr(2)}, "b": {intPtr(2)}, "c": {intPtr(2)}},
 		},
 		{
-			"map[string][]*int empty",
-			map[string][]*int{},
-			map[string][]*int{},
-			map[string][]*int{},
+			name: "map[string][]*int empty",
+			v1:   map[string][]*int{},
+			v2:   map[string][]*int{},
+			want: map[string][]*int{},
 		},
 		{
-			"map[string][]*int mixed empty",
-			map[string][]*int{"a": {intPtr(1)}},
-			map[string][]*int{},
-			map[string][]*int{"a": {intPtr(1)}},
+			name: "map[string][]*int mixed empty",
+			v1:   map[string][]*int{"a": {intPtr(1)}},
+			v2:   map[string][]*int{},
+			want: map[string][]*int{"a": {intPtr(1)}},
 		},
 		{
-			"map[string][]*int mixed empty 2",
-			map[string][]*int{},
-			map[string][]*int{"a": {intPtr(2)}},
-			map[string][]*int{"a": {intPtr(2)}},
+			name: "map[string][]*int mixed empty 2",
+			v1:   map[string][]*int{},
+			v2:   map[string][]*int{"a": {intPtr(2)}},
+			want: map[string][]*int{"a": {intPtr(2)}},
 		},
 		{
-			"map[string][]*int mixed empty 3",
-			map[string][]*int{"a": {intPtr(1)}},
-			map[string][]*int{"a": nil},
-			map[string][]*int{"a": {intPtr(1)}},
+			name: "map[string][]*int mixed empty 3",
+			v1:   map[string][]*int{"a": {intPtr(1)}},
+			v2:   map[string][]*int{"a": nil},
+			want: map[string][]*int{"a": {intPtr(1)}},
 		},
 		{
-			"map[string][]*int mixed empty 4",
-			map[string][]*int{"a": nil},
-			map[string][]*int{"a": {intPtr(2)}},
-			map[string][]*int{"a": {intPtr(2)}},
+			name: "map[string][]*int mixed empty 4",
+			v1:   map[string][]*int{"a": nil},
+			v2:   map[string][]*int{"a": {intPtr(2)}},
+			want: map[string][]*int{"a": {intPtr(2)}},
 		},
 		{
-			"map[string][]*int non empty",
-			map[string][]*int{"a": {intPtr(1)}, "b": {intPtr(1)}},
-			map[string][]*int{"a": {intPtr(1), intPtr(2)}, "c": nil},
-			map[string][]*int{"a": {intPtr(1), intPtr(2)}, "b": {intPtr(1)}, "c": nil},
+			name: "map[string][]*int non empty",
+			v1:   map[string][]*int{"a": {intPtr(1)}, "b": {intPtr(1)}},
+			v2:   map[string][]*int{"a": {intPtr(1), intPtr(2)}, "c": nil},
+			want: map[string][]*int{"a": {intPtr(1), intPtr(2)}, "b": {intPtr(1)}, "c": nil},
 		},
 		{
-			"map[string]interface{} empty",
-			map[string]interface{}{},
-			map[string]interface{}{},
-			map[string]interface{}{},
+			name: "map[string]interface{} empty",
+			v1:   map[string]interface{}{},
+			v2:   map[string]interface{}{},
+			want: map[string]interface{}{},
 		},
 		{
-			"map[string]interface{} mixed empty",
-			map[string]interface{}{"a": &bar{intPtr(1)}},
-			map[string]interface{}{},
-			map[string]interface{}{"a": &bar{intPtr(1)}},
+			name: "map[string]interface{} mixed empty",
+			v1:   map[string]interface{}{"a": &bar{intPtr(1)}},
+			v2:   map[string]interface{}{},
+			want: map[string]interface{}{"a": &bar{intPtr(1)}},
 		},
 		{
-			"map[string]interface{} mixed empty 2",
-			map[string]interface{}{},
-			map[string]interface{}{"b": &bar{intPtr(2)}},
-			map[string]interface{}{"b": &bar{intPtr(2)}},
+			name: "map[string]interface{} mixed empty 2",
+			v1:   map[string]interface{}{},
+			v2:   map[string]interface{}{"b": &bar{intPtr(2)}},
+			want: map[string]interface{}{"b": &bar{intPtr(2)}},
 		},
 		{
-			"map[string]interface{} nested nils",
-			map[string]interface{}{"a": &bar{nil}, "b": nil},
-			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
-			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
+			name: "map[string]interface{} nested nils",
+			v1:   map[string]interface{}{"a": &bar{nil}, "b": nil},
+			v2:   map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
+			want: map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
 		},
 		{
-			"map[string]interface{} nested nils 2",
-			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
-			map[string]interface{}{"a": &bar{nil}, "b": nil},
-			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
+			name: "map[string]interface{} nested nils 2",
+			v1:   map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
+			v2:   map[string]interface{}{"a": &bar{nil}, "b": nil},
+			want: map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
 		},
 		{
-			"map[string]interface{} non empty",
-			map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
-			map[string]interface{}{"a": &bar{intPtr(2)}, "c": &bar{intPtr(2)}},
-			map[string]interface{}{"a": &bar{intPtr(2)}, "b": &bar{intPtr(2)}, "c": &bar{intPtr(2)}},
+			name: "map[string]interface{} non empty",
+			v1:   map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
+			v2:   map[string]interface{}{"a": &bar{intPtr(2)}, "c": &bar{intPtr(2)}},
+			want: map[string]interface{}{"a": &bar{intPtr(2)}, "b": &bar{intPtr(2)}, "c": &bar{intPtr(2)}},
+		},
+		{
+			name:    "generic error copy key 1",
+			v1:      map[string]int{"a": 1},
+			v2:      map[string]int{"b": 2},
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepCopyErrorWhen("a")},
+		},
+		{
+			name:    "generic error copy value 1",
+			v1:      map[string]int{"a": 1},
+			v2:      map[string]int{"b": 2},
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepCopyErrorWhen(1)},
+		},
+		{
+			name:    "generic error copy key 1",
+			v1:      map[string]int{"a": 1},
+			v2:      map[string]int{"b": 2},
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepCopyErrorWhen("b")},
+		},
+		{
+			name:    "generic error copy value 1",
+			v1:      map[string]int{"a": 1},
+			v2:      map[string]int{"b": 2},
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepCopyErrorWhen(2)},
+		},
+		{
+			name:    "generic error copy common entry key",
+			v1:      map[string]int{"a": 1},
+			v2:      map[string]int{"a": 2},
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepCopyErrorWhen("a")},
+		},
+		{
+			name:    "generic error merge common entry value",
+			v1:      map[string]int{"a": 1},
+			v2:      map[string]int{"a": 2},
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepMergeErrorWhen(1, 2)},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			coalescer := NewCoalescer()
-			got, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got.Interface())
+			c := newCoalescer(tt.opts...)
+			got, err := c.deepMergeMap(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+			if err == nil {
+				assert.Equal(t, tt.want, got.Interface())
+				assertNotSame(t, tt.v1, got.Interface())
+				assertNotSame(t, tt.v2, got.Interface())
+			} else {
+				assert.False(t, got.IsValid())
+			}
+			if tt.wantErr != nil {
+				tt.wantErr(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
-	t.Run("fallback error", func(t *testing.T) {
-		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
-			return reflect.Value{}, errors.New("fake")
-		}))
-		_, err := coalescer(reflect.ValueOf(map[string]int{"a": 2}), reflect.ValueOf(map[string]int{"a": 2}))
-		assert.EqualError(t, err, "fake")
-	})
+}
+
+func Test_coalescer_deepCopyMap(t *testing.T) {
+	type foo struct {
+		FieldInt int
+	}
+	type bar struct {
+		FieldIntPtr *int
+	}
+	tests := []struct {
+		name    string
+		v       interface{}
+		wantErr assert.ErrorAssertionFunc
+		opts    []Option
+	}{
+		{
+			name: "map[string]int zero",
+			v:    (map[string]int)(nil),
+		},
+		{
+			name: "map[string]int empty",
+			v:    map[string]int{},
+		},
+		{
+			name: "map[string]int non empty",
+			v:    map[string]int{"a": 1, "b": 1},
+		},
+		{
+			name: "map[string]foo zero",
+			v:    (map[string]foo)(nil),
+		},
+		{
+			name: "map[string]foo empty",
+			v:    map[string]foo{},
+		},
+		{
+			name: "map[string]foo non empty",
+			v:    map[string]foo{"a": {1}, "b": {2}},
+		},
+		{
+			name: "map[string]*int zero",
+			v:    (map[string]*int)(nil),
+		},
+		{
+			name: "map[string]*int empty",
+			v:    map[string]*int{},
+		},
+		{
+			name: "map[string]*int non empty",
+			v:    map[string]*int{"a": intPtr(1), "b": intPtr(1)},
+		},
+		{
+			name: "map[string][]int empty",
+			v:    map[string][]int{},
+		},
+		{
+			name: "map[string][]int non empty",
+			v:    map[string][]int{"a": {1}, "b": {1}},
+		},
+		{
+			name: "map[string][]*int empty",
+			v:    map[string][]*int{},
+		},
+		{
+			name: "map[string][]*int non empty",
+			v:    map[string][]*int{"a": {intPtr(1)}, "b": {intPtr(1)}},
+		},
+		{
+			name: "map[string]interface{} empty",
+			v:    map[string]interface{}{},
+		},
+		{
+			name: "map[string]interface{} non empty",
+			v:    map[string]interface{}{"a": &bar{intPtr(1)}, "b": &bar{intPtr(2)}},
+		},
+		{
+			name:    "generic error copy key",
+			v:       map[string]int{"a": 1},
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepCopyErrorWhen("a")},
+		},
+		{
+			name:    "generic error copy value",
+			v:       map[string]int{"a": 1},
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepCopyErrorWhen(1)},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newCoalescer(tt.opts...)
+			got, err := c.deepCopyMap(reflect.ValueOf(tt.v))
+			if err == nil {
+				assert.Equal(t, tt.v, got.Interface())
+				assertNotSame(t, tt.v, got.Interface())
+			} else {
+				assert.False(t, got.IsValid())
+			}
+			if tt.wantErr != nil {
+				tt.wantErr(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

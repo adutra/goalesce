@@ -14,19 +14,33 @@
 
 package goalesce
 
-import (
-	"reflect"
-)
+import "reflect"
 
-func (c *mainCoalescer) coalesceInterface(v1, v2 reflect.Value) (reflect.Value, error) {
-	if v1.Elem().Type() != v2.Elem().Type() {
-		return v2, nil
+func (c *coalescer) deepMergeInterface(v1, v2 reflect.Value) (reflect.Value, error) {
+	if value, done := checkZero(v1, v2); done {
+		return c.deepCopy(value)
+	}
+	if err := checkTypesMatch(v1.Elem(), v2.Elem()); err != nil {
+		return reflect.Value{}, err
 	}
 	coalesced := reflect.New(v1.Type())
-	coalescedTarget, err := c.coalesce(v1.Elem(), v2.Elem())
+	coalescedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
 	if err != nil {
 		return reflect.Value{}, err
 	}
 	coalesced.Elem().Set(coalescedTarget)
 	return coalesced.Elem(), nil
+}
+
+func (c *coalescer) deepCopyInterface(v reflect.Value) (reflect.Value, error) {
+	if v.IsZero() {
+		return reflect.Zero(v.Type()), nil
+	}
+	copied := reflect.New(v.Type())
+	copiedTarget, err := c.deepCopy(v.Elem())
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	copied.Elem().Set(copiedTarget)
+	return copied.Elem(), nil
 }

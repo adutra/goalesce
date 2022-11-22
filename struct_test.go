@@ -15,7 +15,6 @@
 package goalesce
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
@@ -23,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_mainCoalescer_coalesceStruct(t *testing.T) {
+func Test_coalescer_deepMergeStruct(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		type foo struct {
 			FieldInt int
@@ -105,12 +104,6 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 				bar{},
 			},
 			{
-				"field interface different types",
-				bar{FieldInterface: 1},
-				bar{FieldInterface: "abc"},
-				bar{FieldInterface: "abc"},
-			},
-			{
 				"field interface nil 1",
 				bar{FieldInterface: &foo{FieldInt: 1}},
 				bar{FieldInterface: nil},
@@ -149,10 +142,12 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				coalescer := NewCoalescer()
-				got, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+				c := newCoalescer()
+				got, err := c.deepMergeStruct(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got.Interface())
+				assertNotSame(t, tt.v1, got.Interface())
+				assertNotSame(t, tt.v2, got.Interface())
 			})
 		}
 	})
@@ -168,18 +163,20 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 		}
 		type bar struct {
 			FieldInts            []int
-			FieldIntsAtomic      []int `goalesce:"atomic"`
-			FieldIntsUnion       []int `goalesce:"union"`
-			FieldIntsAppend      []int `goalesce:"append"`
-			FieldIntsIndex       []int `goalesce:"index"`
+			FieldIntsAtomic      []int  `goalesce:"atomic"`
+			FieldIntsUnion       []int  `goalesce:"union"`
+			FieldIntsAppend      []int  `goalesce:"append"`
+			FieldIntsIndex       []int  `goalesce:"index"`
+			FieldIntsIndexArray  [3]int `goalesce:"index"`
 			FieldFoos            []foo
 			FieldFoosAtomic      []foo    `goalesce:"atomic"`
 			FieldFoosUnion       []foo    `goalesce:"union"`
 			FieldFoosAppend      []foo    `goalesce:"append"`
 			FieldFoosIndex       []foo    `goalesce:"index"`
-			FieldFoosMergeKey    []foo    `goalesce:"merge,FieldInt"`
-			FieldFooPtrsMergeKey []*foo   `goalesce:"merge,FieldIntPtr"`
-			FieldNestedSlice     []nested `goalesce:"merge,FieldKey"`
+			FieldFoosIndexArray  [3]foo   `goalesce:"index"`
+			FieldFoosMergeKey    []foo    `goalesce:"id:FieldInt"`
+			FieldFooPtrsMergeKey []*foo   `goalesce:"id:FieldIntPtr"`
+			FieldNestedSlice     []nested `goalesce:"id:FieldKey"`
 		}
 		tests := []struct {
 			name string
@@ -218,6 +215,12 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 				bar{FieldIntsIndex: []int{-1, -2, 3}},
 			},
 			{
+				"array ints index",
+				bar{FieldIntsIndexArray: [3]int{1, 2, 3}},
+				bar{FieldIntsIndexArray: [3]int{-1, -2}},
+				bar{FieldIntsIndexArray: [3]int{-1, -2, 3}},
+			},
+			{
 				"slice foos default",
 				bar{FieldFoos: []foo{{FieldInt: 1}, {FieldInt: 2}}},
 				bar{FieldFoos: []foo{{FieldInt: 2}, {FieldInt: 3}}},
@@ -248,6 +251,12 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 				bar{FieldFoosIndex: []foo{{FieldInt: -1}, {FieldInt: -2}, {FieldInt: 3}}},
 			},
 			{
+				"array foos index",
+				bar{FieldFoosIndexArray: [3]foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}}},
+				bar{FieldFoosIndexArray: [3]foo{{FieldInt: -1}, {FieldInt: -2}}},
+				bar{FieldFoosIndexArray: [3]foo{{FieldInt: -1}, {FieldInt: -2}, {FieldInt: 3}}},
+			},
+			{
 				"slice foos merge key",
 				bar{FieldFoosMergeKey: []foo{{FieldInt: 1}, {FieldInt: 2}}},
 				bar{FieldFoosMergeKey: []foo{{FieldInt: 2}, {FieldInt: 3}}},
@@ -268,40 +277,48 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				coalescer := NewCoalescer()
-				got, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+				c := newCoalescer()
+				got, err := c.deepMergeStruct(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got.Interface())
+				assertNotSame(t, tt.v1, got.Interface())
+				assertNotSame(t, tt.v2, got.Interface())
 			})
 		}
 	})
 	t.Run("options", func(t *testing.T) {
-		t.Run("field coalescer", func(t *testing.T) {
+		t.Run("field merger", func(t *testing.T) {
 			type foo struct {
 				FieldInts []int
 			}
-			coalescer := NewCoalescer(WithFieldCoalescer(reflect.TypeOf(foo{}), "FieldInts", coalesceSliceAppend))
-			got, err := coalescer(reflect.ValueOf(foo{FieldInts: []int{1, 2}}), reflect.ValueOf(foo{FieldInts: []int{2, 3}}))
+			fieldMerger := func(v1, v2 reflect.Value) (reflect.Value, error) {
+				return reflect.ValueOf([]int{1, 2, 3}), nil
+			}
+			c := newCoalescer(WithFieldMerger(reflect.TypeOf(foo{}), "FieldInts", fieldMerger))
+			got, err := c.deepMergeStruct(reflect.ValueOf(foo{FieldInts: []int{1, 2}}), reflect.ValueOf(foo{FieldInts: []int{2, 3}}))
 			require.NoError(t, err)
-			assert.Equal(t, foo{FieldInts: []int{1, 2, 2, 3}}, got.Interface())
+			assert.Equal(t, foo{FieldInts: []int{1, 2, 3}}, got.Interface())
 		})
-		t.Run("field coalescer provider", func(t *testing.T) {
+		t.Run("field merger provider", func(t *testing.T) {
 			type foo struct {
 				FieldInts []int
 			}
-			coalescer := NewCoalescer(WithFieldCoalescerProvider(reflect.TypeOf(foo{}), "FieldInts", func(parent Coalescer) Coalescer {
-				return coalesceSliceAppend
+			fieldMerger := func(v1, v2 reflect.Value) (reflect.Value, error) {
+				return reflect.ValueOf([]int{1, 2, 3}), nil
+			}
+			c := newCoalescer(WithFieldMergerProvider(reflect.TypeOf(foo{}), "FieldInts", func(parent DeepMergeFunc) DeepMergeFunc {
+				return fieldMerger
 			}))
-			got, err := coalescer(reflect.ValueOf(foo{FieldInts: []int{1, 2}}), reflect.ValueOf(foo{FieldInts: []int{2, 3}}))
+			got, err := c.deepMergeStruct(reflect.ValueOf(foo{FieldInts: []int{1, 2}}), reflect.ValueOf(foo{FieldInts: []int{2, 3}}))
 			require.NoError(t, err)
-			assert.Equal(t, foo{FieldInts: []int{1, 2, 2, 3}}, got.Interface())
+			assert.Equal(t, foo{FieldInts: []int{1, 2, 3}}, got.Interface())
 		})
 		t.Run("atomic field", func(t *testing.T) {
 			type foo struct {
 				FieldInts map[int]string
 			}
-			coalescer := NewCoalescer(WithAtomicField(reflect.TypeOf(foo{}), "FieldInts"))
-			got, err := coalescer(
+			c := newCoalescer(WithAtomicFieldMerge(reflect.TypeOf(foo{}), "FieldInts"))
+			got, err := c.deepMergeStruct(
 				reflect.ValueOf(foo{FieldInts: map[int]string{1: "abc"}}),
 				reflect.ValueOf(foo{FieldInts: map[int]string{1: "def"}}),
 			)
@@ -312,8 +329,8 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 			type foo struct {
 				FieldInts []int
 			}
-			coalescer := NewCoalescer(WithFieldSetUnion(reflect.TypeOf(foo{}), "FieldInts"))
-			got, err := coalescer(
+			c := newCoalescer(WithFieldSetUnionMerge(reflect.TypeOf(foo{}), "FieldInts"))
+			got, err := c.deepMergeStruct(
 				reflect.ValueOf(foo{FieldInts: []int{1, 2}}),
 				reflect.ValueOf(foo{FieldInts: []int{2, 3}}),
 			)
@@ -324,8 +341,8 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 			type foo struct {
 				FieldInts []int
 			}
-			coalescer := NewCoalescer(WithFieldListAppend(reflect.TypeOf(foo{}), "FieldInts"))
-			got, err := coalescer(
+			c := newCoalescer(WithFieldListAppendMerge(reflect.TypeOf(foo{}), "FieldInts"))
+			got, err := c.deepMergeStruct(
 				reflect.ValueOf(foo{FieldInts: []int{1, 2}}),
 				reflect.ValueOf(foo{FieldInts: []int{2, 3}}),
 			)
@@ -336,8 +353,8 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 			type foo struct {
 				FieldInts []int
 			}
-			coalescer := NewCoalescer(WithFieldMergeByIndex(reflect.TypeOf(foo{}), "FieldInts"))
-			got, err := coalescer(
+			c := newCoalescer(WithFieldMergeByIndex(reflect.TypeOf(foo{}), "FieldInts"))
+			got, err := c.deepMergeStruct(
 				reflect.ValueOf(foo{FieldInts: []int{1, 2}}),
 				reflect.ValueOf(foo{FieldInts: []int{-1}}),
 			)
@@ -351,8 +368,8 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 			type foo struct {
 				FieldBars []bar
 			}
-			coalescer := NewCoalescer(WithFieldMergeByID(reflect.TypeOf(foo{}), "FieldBars", "Name"))
-			got, err := coalescer(
+			c := newCoalescer(WithFieldMergeByID(reflect.TypeOf(foo{}), "FieldBars", "Name"))
+			got, err := c.deepMergeStruct(
 				reflect.ValueOf(foo{FieldBars: []bar{{"a"}, {"b"}}}),
 				reflect.ValueOf(foo{FieldBars: []bar{{"b"}, {"a"}}}),
 			)
@@ -363,8 +380,8 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 			type foo struct {
 				FieldInts []int
 			}
-			coalescer := NewCoalescer(WithFieldMergeByKeyFunc(reflect.TypeOf(foo{}), "FieldInts", SliceUnion))
-			got, err := coalescer(
+			c := newCoalescer(WithFieldMergeByKeyFunc(reflect.TypeOf(foo{}), "FieldInts", SliceUnion))
+			got, err := c.deepMergeStruct(
 				reflect.ValueOf(foo{FieldInts: []int{1, 2}}),
 				reflect.ValueOf(foo{FieldInts: []int{2, 3}}),
 			)
@@ -389,23 +406,23 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 			FieldInt int `goalesce:"index"`
 		}
 		type invalidMerge struct {
-			FieldInt int `goalesce:"merge"`
+			FieldInt int `goalesce:"id"`
 		}
 		type missingKey struct {
-			FieldInts []int `goalesce:"merge"`
+			FieldInts []int `goalesce:"id"`
 		}
 		type missingKey2 struct {
-			FieldInts []int `goalesce:"merge,"`
+			FieldInts []int `goalesce:"id:"`
 		}
 		type missingKey3 struct {
-			FieldInts []int `goalesce:"merge key"`
+			FieldInts []int `goalesce:"id key"`
 		}
 		type wrongElemType struct {
-			FieldInts []int `goalesce:"merge,irrelevant"`
+			FieldInts []int `goalesce:"id:irrelevant"`
 		}
 		type unknownField struct {
-			FieldFoos    []foo  `goalesce:"merge,unknown"`
-			FieldFooPtrs []*foo `goalesce:"merge,unknown"`
+			FieldFoos    []foo  `goalesce:"id:unknown"`
+			FieldFooPtrs []*foo `goalesce:"id:unknown"`
 		}
 		tests := []struct {
 			name string
@@ -417,7 +434,7 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 				"unknown strategy",
 				unknownStrategy{FieldInts: []int{1, 2}},
 				unknownStrategy{FieldInts: []int{2, 3}},
-				"field goalesce.unknownStrategy.FieldInts: unknown coalesce strategy: unknown",
+				"field goalesce.unknownStrategy.FieldInts: unknown merge strategy: unknown",
 			},
 			{
 				"invalid append",
@@ -435,31 +452,31 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 				"invalid index",
 				invalidIndex{FieldInt: 1},
 				invalidIndex{FieldInt: 2},
-				"field goalesce.invalidIndex.FieldInt: index strategy is only supported for slices",
+				"field goalesce.invalidIndex.FieldInt: index strategy is only supported for slices and arrays",
 			},
 			{
 				"invalid merge",
 				invalidMerge{FieldInt: 1},
 				invalidMerge{FieldInt: 2},
-				"field goalesce.invalidMerge.FieldInt: merge strategy is only supported for slices",
+				"field goalesce.invalidMerge.FieldInt: id strategy is only supported for slices",
 			},
 			{
 				"missing merge key",
 				missingKey{FieldInts: []int{1}},
 				missingKey{FieldInts: []int{2}},
-				"field goalesce.missingKey.FieldInts: merge strategy must be followed by a comma and the merge key",
+				"field goalesce.missingKey.FieldInts: id strategy must be followed by a colon and the merge key",
 			},
 			{
 				"missing merge key 2",
 				missingKey2{FieldInts: []int{1}},
 				missingKey2{FieldInts: []int{2}},
-				"field goalesce.missingKey2.FieldInts: merge strategy must be followed by a comma and the merge key",
+				"field goalesce.missingKey2.FieldInts: id strategy must be followed by a colon and the merge key",
 			},
 			{
 				"missing merge key 3",
 				missingKey3{FieldInts: []int{1}},
 				missingKey3{FieldInts: []int{2}},
-				"field goalesce.missingKey3.FieldInts: merge strategy must be followed by a comma and the merge key",
+				"field goalesce.missingKey3.FieldInts: id strategy must be followed by a colon and the merge key",
 			},
 			{
 				"wrong element type",
@@ -482,21 +499,27 @@ func Test_mainCoalescer_coalesceStruct(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				coalescer := NewCoalescer()
-				_, err := coalescer(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
+				c := newCoalescer()
+				_, err := c.deepMergeStruct(reflect.ValueOf(tt.v1), reflect.ValueOf(tt.v2))
 				assert.EqualError(t, err, tt.want)
 			})
 		}
 	})
-	t.Run("fallback error", func(t *testing.T) {
+	t.Run("field merge errors", func(t *testing.T) {
+		type foo struct {
+			FieldInterface interface{}
+		}
+		c := newCoalescer()
+		_, err := c.deepMergeStruct(reflect.ValueOf(foo{FieldInterface: 123}), reflect.ValueOf(foo{FieldInterface: "abc"}))
+		assert.EqualError(t, err, "types do not match: int != string")
+	})
+	t.Run("generic error", func(t *testing.T) {
 		type foo struct {
 			FieldInt int
 		}
-		coalescer := NewCoalescer(WithTypeCoalescer(reflect.TypeOf(0), func(v1, v2 reflect.Value) (reflect.Value, error) {
-			return reflect.Value{}, errors.New("fake")
-		}))
-		_, err := coalescer(reflect.ValueOf(foo{FieldInt: 1}), reflect.ValueOf(foo{FieldInt: 2}))
-		assert.EqualError(t, err, "fake")
+		c := newCoalescer(withMockDeepMergeError)
+		_, err := c.deepMergeStruct(reflect.ValueOf(foo{FieldInt: 1}), reflect.ValueOf(foo{FieldInt: 2}))
+		assert.EqualError(t, err, "mock DeepMerge error")
 	})
 }
 
@@ -554,4 +577,61 @@ func Test_newMergeByField(t *testing.T) {
 		assert.False(t, mergeKey.IsValid())
 		assert.ErrorContains(t, err, "struct type goalesce.User has no field named NonExistent")
 	})
+}
+
+func Test_coalescer_deepCopyStruct(t *testing.T) {
+	type Foo struct {
+		FieldInt int
+		FieldStr string
+		FieldPtr *string
+	}
+	tests := []struct {
+		name    string
+		v       reflect.Value
+		want    reflect.Value
+		wantErr assert.ErrorAssertionFunc
+		opts    []Option
+	}{
+		{
+			name: "zero",
+			v:    reflect.ValueOf(Foo{}),
+			want: reflect.ValueOf(Foo{}),
+		},
+		{
+			name: "non zero",
+			v: reflect.ValueOf(Foo{
+				FieldInt: 123,
+				FieldStr: "abc",
+				FieldPtr: stringPtr("def"),
+			}),
+			want: reflect.ValueOf(Foo{
+				FieldInt: 123,
+				FieldStr: "abc",
+				FieldPtr: stringPtr("def"),
+			}),
+		},
+		{
+			name:    "error",
+			v:       reflect.ValueOf(Foo{FieldInt: 123}),
+			wantErr: assert.Error,
+			opts:    []Option{withMockDeepCopyError},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newCoalescer(tt.opts...)
+			got, err := c.deepCopyStruct(tt.v)
+			if err == nil {
+				assert.Equal(t, tt.want.Interface(), got.Interface())
+				assertNotSame(t, tt.v.Interface(), got.Interface())
+			} else {
+				assert.False(t, got.IsValid())
+			}
+			if tt.wantErr != nil {
+				tt.wantErr(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

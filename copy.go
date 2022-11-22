@@ -14,9 +14,7 @@
 
 package goalesce
 
-import (
-	"reflect"
-)
+import "reflect"
 
 // DeepCopy deep-copies the value and returns the copied value.
 //

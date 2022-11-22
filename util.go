@@ -60,9 +60,9 @@ func checkZero(v1, v2 reflect.Value) (reflect.Value, bool) {
 	return reflect.Value{}, false
 }
 
-func checkTypesMatch(v1, v2 reflect.Type) error {
-	if v1 != v2 {
-		return fmt.Errorf("types do not match: %s != %s", v1.String(), v2.String())
+func checkTypesMatch(v1, v2 reflect.Value) error {
+	if v1.Type() != v2.Type() {
+		return fmt.Errorf("types do not match: %s != %s", v1.Type().String(), v2.Type().String())
 	}
 	return nil
 }

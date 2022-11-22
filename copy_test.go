@@ -15,6 +15,7 @@
 package goalesce
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -111,6 +112,12 @@ func TestDeepCopy(t *testing.T) {
 			FieldMap:    map[string]int{"a": 1, "b": 2, "c": 3},
 		}, got)
 		assertNotSame(t, x, got)
+		assert.NoError(t, err)
+	})
+	t.Run("interface", func(t *testing.T) {
+		var x error = errors.New("abc")
+		got, err := DeepCopy(x)
+		assert.Equal(t, errors.New("abc"), got)
 		assert.NoError(t, err)
 	})
 	t.Run("with type copier", func(t *testing.T) {

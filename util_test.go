@@ -127,23 +127,35 @@ func Test_checkZero(t *testing.T) {
 func Test_checkTypesMatch(t *testing.T) {
 	tests := []struct {
 		name    string
-		v1      reflect.Type
-		v2      reflect.Type
+		v1      reflect.Value
+		v2      reflect.Value
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "same type",
-			v1:      reflect.TypeOf(0),
-			v2:      reflect.TypeOf(1),
+			v1:      reflect.ValueOf(0),
+			v2:      reflect.ValueOf(0),
 			wantErr: assert.NoError,
 		},
 		{
 			name: "different type",
-			v1:   reflect.TypeOf(0),
-			v2:   reflect.TypeOf("abc"),
+			v1:   reflect.ValueOf(0),
+			v2:   reflect.ValueOf("abc"),
 			wantErr: func(t assert.TestingT, err error, args ...interface{}) bool {
 				return assert.EqualError(t, err, "types do not match: int != string")
 			},
+		},
+		{
+			name: "different underlying interface type",
+			v1: reflect.ValueOf(func() *interface{} {
+				x := interface{}(0)
+				return &x
+			}()).Elem(),
+			v2: reflect.ValueOf(func() *interface{} {
+				x := interface{}("abc")
+				return &x
+			}()).Elem(),
+			wantErr: assert.NoError,
 		},
 	}
 	for _, tt := range tests {

@@ -20,13 +20,13 @@ func (c *coalescer) deepMergeInterface(v1, v2 reflect.Value) (reflect.Value, err
 	if value, done := checkZero(v1, v2); done {
 		return c.deepCopy(value)
 	}
-	coalesced := reflect.New(v1.Type())
-	coalescedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
+	mergedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
 	if err != nil {
 		return reflect.Value{}, err
 	}
-	coalesced.Elem().Set(coalescedTarget)
-	return coalesced.Elem(), nil
+	merged := reflect.New(v1.Type())
+	merged.Elem().Set(mergedTarget)
+	return merged.Elem(), nil
 }
 
 func (c *coalescer) deepCopyInterface(v reflect.Value) (reflect.Value, error) {

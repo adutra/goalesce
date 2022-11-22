@@ -14,9 +14,7 @@
 
 package goalesce
 
-import (
-	"reflect"
-)
+import "reflect"
 
 // DeepMerge merges the 2 values and returns the merged value.
 //

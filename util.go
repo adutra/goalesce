@@ -28,6 +28,8 @@ func zero[T any]() (z T) {
 func cast[T any](v reflect.Value) (T, error) {
 	itf, ok := v.Interface().(T)
 	if !ok {
+		// this should never happen since we check types before calling this function,
+		// but we check anyway to be safe
 		return itf, fmt.Errorf("cannot convert %s to %T", v.Type(), itf)
 	}
 	return itf, nil
@@ -60,9 +62,21 @@ func checkZero(v1, v2 reflect.Value) (reflect.Value, bool) {
 	return reflect.Value{}, false
 }
 
-func checkTypesMatch(v1, v2 reflect.Value) error {
-	if v1.Type() != v2.Type() {
-		return fmt.Errorf("types do not match: %s != %s", v1.Type().String(), v2.Type().String())
+func checkTypesMatch(v1, v2 reflect.Type) error {
+	if v1 != v2 {
+		return fmt.Errorf("types do not match: %s != %s", v1.String(), v2.String())
 	}
 	return nil
+}
+
+func checkCustomResult(result reflect.Value, err error, expectedType reflect.Type) (bool, reflect.Value, error) {
+	if err != nil {
+		return true, reflect.Value{}, err
+	} else if result.IsValid() {
+		if err := checkTypesMatch(result.Type(), expectedType); err != nil {
+			return true, reflect.Value{}, err
+		}
+		return true, result, nil
+	}
+	return false, reflect.Value{}, nil
 }

@@ -59,11 +59,14 @@ func (c *coalescer) defaultDeepMerge(v1, v2 reflect.Value) (reflect.Value, error
 	} else if !v2.IsValid() {
 		return c.deepCopy(v1)
 	}
-	if err := checkTypesMatch(v1, v2); err != nil {
+	if err := checkTypesMatch(v1.Type(), v2.Type()); err != nil {
 		return reflect.Value{}, err
 	}
 	if merger, found := c.typeMergers[v1.Type()]; found {
-		return merger(v1, v2)
+		merged, err := merger(v1, v2)
+		if done, merged, err := checkCustomResult(merged, err, v1.Type()); done {
+			return merged, err
+		}
 	}
 	switch v1.Type().Kind() {
 	case reflect.Interface:
@@ -90,7 +93,10 @@ func (c *coalescer) defaultDeepCopy(v reflect.Value) (reflect.Value, error) {
 		return v, nil
 	}
 	if copier, found := c.typeCopiers[v.Type()]; found {
-		return copier(v)
+		copied, err := copier(v)
+		if done, copied, err := checkCustomResult(copied, err, v.Type()); done {
+			return copied, err
+		}
 	}
 	switch v.Type().Kind() {
 	case reflect.Interface:

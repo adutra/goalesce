@@ -79,6 +79,8 @@ Output:
 
     DeepCopy({ID:1 Name:Alice}) = {ID:1 Name:Alice}
 
+Only exported fields can be copied. Unexported fields are ignored.
+
 ### Copying pointers
 
 The copied pointer never points to the same memory address; the pointer target is deep-copied:
@@ -191,6 +193,33 @@ fmt.Printf("DeepMerge(%v, %v) = %v\n", v1, v2, merged)
 Output:
 
     DeepMerge(map[1:a 2:b], map[2:c 3:d]) = map[1:a 2:c 3:d]
+
+### Merging interfaces
+
+When both interfaces are non-zero-values, the default behavior is to merge their runtime values
+recursively.
+
+```go
+type Bird interface {
+    Chirp()
+}
+type Duck struct {
+    Name string
+}
+func (d *Duck) Chirp() {
+    println("quack")
+}
+v1 := Bird(&Duck{Name: "Donald"})
+v2 := Bird(&Duck{Name: "Scrooge"})
+merged, _ = goalesce.DeepMerge(v1, v2)
+fmt.Printf("DeepMerge(%+v, %+v) = %+v\n", v1, v2, merged)
+```
+
+Output:
+
+    DeepMerge(&{Name:Donald}, &{Name:Scrooge}) = &{Name:Scrooge}
+
+If the two values have different runtime types, an error is returned.
 
 ### Merging slices and arrays
 
@@ -434,6 +463,8 @@ fmt.Printf("DeepMerge(%+v, %+v) = %+v\n", v1, v2, merged)
 Output:
 
     DeepMerge({ID:1 Name:Alice}, {ID:1 Age:20}) = {ID:1 Name:Alice Age:20}
+
+Only exported fields can be merged. Unexported fields are ignored.
 
 #### Per-field merging strategies
 

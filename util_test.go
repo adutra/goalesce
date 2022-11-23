@@ -15,6 +15,7 @@
 package goalesce
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -127,20 +128,20 @@ func Test_checkZero(t *testing.T) {
 func Test_checkTypesMatch(t *testing.T) {
 	tests := []struct {
 		name    string
-		v1      reflect.Value
-		v2      reflect.Value
+		v1      reflect.Type
+		v2      reflect.Type
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "same type",
-			v1:      reflect.ValueOf(0),
-			v2:      reflect.ValueOf(0),
+			v1:      reflect.TypeOf(0),
+			v2:      reflect.TypeOf(0),
 			wantErr: assert.NoError,
 		},
 		{
 			name: "different type",
-			v1:   reflect.ValueOf(0),
-			v2:   reflect.ValueOf("abc"),
+			v1:   reflect.TypeOf(0),
+			v2:   reflect.TypeOf("abc"),
 			wantErr: func(t assert.TestingT, err error, args ...interface{}) bool {
 				return assert.EqualError(t, err, "types do not match: int != string")
 			},
@@ -150,11 +151,11 @@ func Test_checkTypesMatch(t *testing.T) {
 			v1: reflect.ValueOf(func() *interface{} {
 				x := interface{}(0)
 				return &x
-			}()).Elem(),
+			}()).Elem().Type(),
 			v2: reflect.ValueOf(func() *interface{} {
 				x := interface{}("abc")
 				return &x
-			}()).Elem(),
+			}()).Elem().Type(),
 			wantErr: assert.NoError,
 		},
 	}
@@ -162,6 +163,65 @@ func Test_checkTypesMatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := checkTypesMatch(tt.v1, tt.v2)
 			tt.wantErr(t, err)
+		})
+	}
+}
+
+func Test_checkCustomResult(t *testing.T) {
+	tests := []struct {
+		name         string
+		result       reflect.Value
+		err          error
+		expectedType reflect.Type
+		wantDone     bool
+		wantValue    reflect.Value
+		wantErr      assert.ErrorAssertionFunc
+	}{
+		{
+			name:         "done ok",
+			result:       reflect.ValueOf(123),
+			err:          nil,
+			expectedType: reflect.TypeOf(123),
+			wantDone:     true,
+			wantValue:    reflect.ValueOf(123),
+			wantErr:      assert.NoError,
+		},
+		{
+			name:         "done error",
+			result:       reflect.ValueOf(123),
+			err:          errors.New("ouch"),
+			expectedType: reflect.TypeOf(123),
+			wantDone:     true,
+			wantValue:    reflect.Value{},
+			wantErr:      assert.Error,
+		},
+		{
+			name:         "done type mismatch",
+			result:       reflect.ValueOf(123),
+			err:          nil,
+			expectedType: reflect.TypeOf("abc"),
+			wantDone:     true,
+			wantValue:    reflect.Value{},
+			wantErr: func(t assert.TestingT, err error, args ...interface{}) bool {
+				return assert.EqualError(t, err, "types do not match: int != string")
+			},
+		},
+		{
+			name:         "not done",
+			result:       reflect.Value{},
+			err:          nil,
+			expectedType: reflect.TypeOf("abc"),
+			wantDone:     false,
+			wantValue:    reflect.Value{},
+			wantErr:      assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotDone, gotValue, gotErr := checkCustomResult(tt.result, tt.err, tt.expectedType)
+			assert.Equal(t, tt.wantDone, gotDone)
+			assert.Equal(t, tt.wantValue, gotValue)
+			tt.wantErr(t, gotErr)
 		})
 	}
 }

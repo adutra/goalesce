@@ -274,6 +274,39 @@ func TestDeepMerge(t *testing.T) {
 		assertNotSame(t, v2, got)
 		assert.NoError(t, err)
 	})
+	t.Run("interface", func(t *testing.T) {
+		var v1 Bird = &Duck{"Donald"}
+		var v2 Bird = &Duck{"Scrooge"}
+		called := false
+		// reflect.TypeOf(v1) is *goalesce.Duck, not Bird
+		got, err := DeepMerge(v1, v2, WithTypeMerger(reflect.TypeOf(v1), func(v1, v2 reflect.Value) (reflect.Value, error) {
+			called = true
+			return reflect.Value{}, nil
+		}))
+		assert.Equal(t, &Duck{"Scrooge"}, got)
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("interface type mismatch", func(t *testing.T) {
+		var v1 Bird = &Duck{"Donald"}
+		var v2 Bird = &Goose{"Scrooge"}
+		got, err := DeepMerge(v1, v2)
+		assert.Zero(t, got)
+		assert.EqualError(t, err, "types do not match: *goalesce.Duck != *goalesce.Goose")
+	})
+	t.Run("interface pointer", func(t *testing.T) {
+		var v1 Bird = &Duck{"Donald"}
+		var v2 Bird = &Duck{"Scrooge"}
+		called := false
+		// reflect.TypeOf(&v1).Elem() is Bird, not *goalesce.Duck
+		got, err := DeepMerge(&v1, &v2, WithTypeMerger(reflect.TypeOf(&v1).Elem(), func(v1, v2 reflect.Value) (reflect.Value, error) {
+			called = true
+			return reflect.Value{}, nil
+		}))
+		assert.Equal(t, &Duck{"Scrooge"}, *got)
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
 	trileanTests := []struct {
 		name string
 		v1   *bool
@@ -424,13 +457,6 @@ func TestDeepMerge(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
-	t.Run("type mismatch", func(t *testing.T) {
-		got, err := DeepMerge("abc", "def", WithTypeMerger(reflect.TypeOf(""), func(v1, v2 reflect.Value) (reflect.Value, error) {
-			return reflect.ValueOf(123), nil
-		}))
-		assert.Equal(t, "", got)
-		assert.EqualError(t, err, "cannot convert int to string")
-	})
 	t.Run("generic error", func(t *testing.T) {
 		got, err := DeepMerge("abc", "def", withMockDeepMergeError)
 		assert.Equal(t, "", got)

@@ -21,6 +21,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type Bird interface {
+	Chirp()
+}
+
+type Duck struct {
+	Name string
+}
+
+func (d *Duck) Chirp() {
+	println("quack")
+}
+
+type Goose struct {
+	Name string
+}
+
+func (d *Goose) Chirp() {
+	println("honk")
+}
+
 func TestDeepCopy(t *testing.T) {
 	// Note: we don't need to test all the types and corner cases here, as the underlying copy
 	// functions are thoroughly tested.
@@ -120,12 +140,29 @@ func TestDeepCopy(t *testing.T) {
 		assert.Equal(t, "def", got)
 		assert.NoError(t, err)
 	})
-	t.Run("type mismatch", func(t *testing.T) {
-		got, err := DeepCopy("abc", WithTypeCopier(reflect.TypeOf(""), func(v reflect.Value) (reflect.Value, error) {
-			return reflect.ValueOf(123), nil
+	t.Run("interface", func(t *testing.T) {
+		var v Bird = &Duck{"Donald"}
+		called := false
+		// reflect.TypeOf(v) is *goalesce.Duck, not Bird
+		got, err := DeepCopy(v, WithTypeCopier(reflect.TypeOf(v), func(v reflect.Value) (reflect.Value, error) {
+			called = true
+			return reflect.Value{}, nil
 		}))
-		assert.Equal(t, "", got)
-		assert.EqualError(t, err, "cannot convert int to string")
+		assert.Equal(t, &Duck{"Donald"}, got)
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("interface pointer", func(t *testing.T) {
+		var v Bird = &Duck{"Donald"}
+		called := false
+		// reflect.TypeOf(&v).Elem() is Bird, not *goalesce.Duck
+		got, err := DeepCopy(&v, WithTypeCopier(reflect.TypeOf(&v).Elem(), func(v reflect.Value) (reflect.Value, error) {
+			called = true
+			return reflect.Value{}, nil
+		}))
+		assert.Equal(t, &Duck{"Donald"}, *got)
+		assert.NoError(t, err)
+		assert.True(t, called)
 	})
 	t.Run("generic error", func(t *testing.T) {
 		got, err := DeepCopy("abc", withMockDeepCopyError)

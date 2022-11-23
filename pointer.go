@@ -36,13 +36,13 @@ func (c *coalescer) deepMergePointer(v1, v2 reflect.Value) (reflect.Value, error
 		c.unsee(v1) // because checkCycle(v1) was called
 		return c.deepCopyPointer(v1)
 	}
-	coalescedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
+	mergedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
 	if err != nil {
 		return reflect.Value{}, err
 	}
-	coalesced := reflect.New(v1.Type().Elem())
-	coalesced.Elem().Set(coalescedTarget)
-	return coalesced, nil
+	merged := reflect.New(v1.Type().Elem())
+	merged.Elem().Set(mergedTarget)
+	return merged, nil
 }
 
 func (c *coalescer) deepCopyPointer(v reflect.Value) (reflect.Value, error) {

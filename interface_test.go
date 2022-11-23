@@ -112,10 +112,10 @@ func Test_coalescer_deepMergeInterface(t *testing.T) {
 			want: &foo{FieldInt: 2},
 		},
 		{
-			name:    "different types",
-			v1:      123,
-			v2:      12.34,
-			wantErr: assert.Error,
+			name: "different types",
+			v1:   123,
+			v2:   12.34,
+			want: 12.34,
 		},
 		{
 			name:    "generic error",
@@ -143,6 +143,22 @@ func Test_coalescer_deepMergeInterface(t *testing.T) {
 			}
 		})
 	}
+	t.Run("non-empty interface", func(t *testing.T) {
+		var v1 Bird = &Duck{"Donald"}
+		var v2 Bird = &Duck{"Scrooge"}
+		c := newCoalescer()
+		got, err := c.deepMergeInterface(reflect.ValueOf(&v1).Elem(), reflect.ValueOf(&v2).Elem())
+		assert.Equal(t, &Duck{"Scrooge"}, got.Interface())
+		assert.NoError(t, err)
+	})
+	t.Run("non-empty interface different runtime types", func(t *testing.T) {
+		var v1 Bird = &Duck{"Donald"}
+		var v2 Bird = &Goose{""} // will be returned as is
+		c := newCoalescer()
+		got, err := c.deepMergeInterface(reflect.ValueOf(&v1).Elem(), reflect.ValueOf(&v2).Elem())
+		assert.Equal(t, &Goose{""}, got.Interface())
+		assert.NoError(t, err)
+	})
 }
 
 func Test_coalescer_deepCopyInterface(t *testing.T) {

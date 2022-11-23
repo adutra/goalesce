@@ -20,7 +20,7 @@ func (c *coalescer) deepMergeMap(v1, v2 reflect.Value) (reflect.Value, error) {
 	if value, done := checkZero(v1, v2); done {
 		return c.deepCopy(value)
 	}
-	coalesced := reflect.MakeMap(v1.Type())
+	merged := reflect.MakeMap(v1.Type())
 	for _, k := range v1.MapKeys() {
 		if !v2.MapIndex(k).IsValid() {
 			copiedKey, err := c.deepCopy(k)
@@ -31,7 +31,7 @@ func (c *coalescer) deepMergeMap(v1, v2 reflect.Value) (reflect.Value, error) {
 			if err != nil {
 				return reflect.Value{}, err
 			}
-			coalesced.SetMapIndex(copiedKey, copiedValue)
+			merged.SetMapIndex(copiedKey, copiedValue)
 		}
 	}
 	for _, k := range v2.MapKeys() {
@@ -40,20 +40,20 @@ func (c *coalescer) deepMergeMap(v1, v2 reflect.Value) (reflect.Value, error) {
 			return reflect.Value{}, err
 		}
 		if v1.MapIndex(k).IsValid() {
-			coalescedValue, err := c.deepMerge(v1.MapIndex(k), v2.MapIndex(k))
+			mergedValue, err := c.deepMerge(v1.MapIndex(k), v2.MapIndex(k))
 			if err != nil {
 				return reflect.Value{}, err
 			}
-			coalesced.SetMapIndex(copiedKey, coalescedValue)
+			merged.SetMapIndex(copiedKey, mergedValue)
 		} else {
 			copiedValue, err := c.deepCopy(v2.MapIndex(k))
 			if err != nil {
 				return reflect.Value{}, err
 			}
-			coalesced.SetMapIndex(copiedKey, copiedValue)
+			merged.SetMapIndex(copiedKey, copiedValue)
 		}
 	}
-	return coalesced, nil
+	return merged, nil
 }
 
 func (c *coalescer) deepCopyMap(v reflect.Value) (reflect.Value, error) {

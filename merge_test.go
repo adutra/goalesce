@@ -24,217 +24,296 @@ import (
 func TestDeepMerge(t *testing.T) {
 	// Note: we don't need to test all the types and corner cases here, as the underlying merge
 	// functions are thoroughly tested.
+	t.Run("untyped nil", func(t *testing.T) {
+		var v1, v2 interface{}
+		got, err := DeepMerge(v1, v2)
+		assert.Nil(t, got)
+		assert.NoError(t, err)
+	})
+	t.Run("untyped nil partial 1", func(t *testing.T) {
+		var v1 interface{} = 1
+		var v2 interface{}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, 1, got)
+		assert.NoError(t, err)
+	})
+	t.Run("untyped nil partial 2", func(t *testing.T) {
+		var v1 interface{}
+		var v2 interface{} = 1
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, 1, got)
+		assert.NoError(t, err)
+	})
+	t.Run("int", func(t *testing.T) {
+		v1 := 1
+		v2 := 2
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, 2, got)
+		assert.NoError(t, err)
+	})
+	t.Run("int mixed zero 1", func(t *testing.T) {
+		v1 := 0
+		v2 := 1
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, 1, got)
+		assert.NoError(t, err)
+	})
+	t.Run("int mixed zero 2", func(t *testing.T) {
+		v1 := 1
+		v2 := 0
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, 1, got)
+		assert.NoError(t, err)
+	})
+	t.Run("*int", func(t *testing.T) {
+		v1 := intPtr(1)
+		v2 := intPtr(2)
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, intPtr(2), got)
+		assertNotSame(t, v1, got)
+		assertNotSame(t, v2, got)
+		assert.NoError(t, err)
+	})
+	t.Run("*int zero", func(t *testing.T) {
+		v1 := (*int)(nil)
+		v2 := (*int)(nil)
+		got, err := DeepMerge(v1, v2)
+		assert.Nil(t, got)
+		assert.NoError(t, err)
+	})
+	t.Run("*int mixed zero 1", func(t *testing.T) {
+		v1 := (*int)(nil)
+		v2 := intPtr(1)
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, intPtr(1), got)
+		assertNotSame(t, v2, got)
+		assert.NoError(t, err)
+	})
+	t.Run("*int mixed zero 2", func(t *testing.T) {
+		v1 := intPtr(1)
+		v2 := (*int)(nil)
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, intPtr(1), got)
+		assertNotSame(t, v1, got)
+		assert.NoError(t, err)
+	})
+	t.Run("string", func(t *testing.T) {
+		v1 := "abc"
+		v2 := "def"
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, "def", got)
+		assert.NoError(t, err)
+	})
+	t.Run("string zero", func(t *testing.T) {
+		v1 := "abc"
+		v2 := ""
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, "abc", got)
+		assert.NoError(t, err)
+	})
+	t.Run("bool", func(t *testing.T) {
+		v1 := true
+		v2 := false
+		got, err := DeepMerge(v1, v2)
+		assert.True(t, got)
+		assert.NoError(t, err)
+	})
 	type foo struct {
 		FieldInt int
 	}
+	t.Run("struct", func(t *testing.T) {
+		v1 := foo{FieldInt: 1}
+		v2 := foo{FieldInt: 2}
+		want := foo{FieldInt: 2}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("struct zero", func(t *testing.T) {
+		v1 := foo{}
+		v2 := foo{FieldInt: 0}
+		want := foo{}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("struct zero mixed 1", func(t *testing.T) {
+		v1 := foo{FieldInt: 1}
+		v2 := foo{FieldInt: 0}
+		want := foo{FieldInt: 1}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("struct zero mixed 2", func(t *testing.T) {
+		v1 := foo{FieldInt: 0}
+		v2 := foo{FieldInt: 1}
+		want := foo{FieldInt: 1}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
 	type bar struct {
 		FieldInt int
 		FieldFoo foo
 	}
-	tests := []struct {
-		name    string
-		v1      interface{}
-		v2      interface{}
-		opts    []Option
-		want    interface{}
-		wantErr assert.ErrorAssertionFunc
+	t.Run("struct complex", func(t *testing.T) {
+		v1 := bar{FieldInt: 0, FieldFoo: foo{FieldInt: 1}}
+		v2 := bar{FieldInt: 1}
+		want := bar{FieldInt: 1, FieldFoo: foo{FieldInt: 1}}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("struct complex atomic", func(t *testing.T) {
+		v1 := bar{FieldInt: 0, FieldFoo: foo{FieldInt: 1}}
+		v2 := bar{FieldInt: 1}
+		want := bar{FieldInt: 1}
+		got, err := DeepMerge(v1, v2, WithAtomicMerge(reflect.TypeOf(bar{})))
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("map[int]int", func(t *testing.T) {
+		v1 := map[int]int{1: 1, 2: 2}
+		v2 := map[int]int{1: 2, 3: 3}
+		want := map[int]int{1: 2, 2: 2, 3: 3}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("map[int]foo", func(t *testing.T) {
+		v1 := map[int]foo{1: {FieldInt: 1}, 3: {FieldInt: 3}}
+		v2 := map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}}
+		want := map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}, 3: {FieldInt: 3}}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("map[int]foo atomic", func(t *testing.T) {
+		v1 := map[int]foo{1: {FieldInt: 1}, 3: {FieldInt: 3}}
+		v2 := map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}}
+		want := map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}}
+		got, err := DeepMerge(v1, v2, WithAtomicMerge(reflect.TypeOf(map[int]foo{})))
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[]int", func(t *testing.T) {
+		v1 := []int{1, 2}
+		v2 := []int{3, 4}
+		want := []int{3, 4}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[]foo", func(t *testing.T) {
+		v1 := []foo{{FieldInt: 1}, {FieldInt: 2}}
+		v2 := []foo{{FieldInt: 3}, {FieldInt: 4}}
+		want := []foo{{FieldInt: 3}, {FieldInt: 4}}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[2]foo", func(t *testing.T) {
+		v1 := [2]foo{{FieldInt: 1}, {FieldInt: 2}}
+		v2 := [2]foo{{FieldInt: 3}, {FieldInt: 4}}
+		want := [2]foo{{FieldInt: 3}, {FieldInt: 4}}
+		got, err := DeepMerge(v1, v2)
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[]int union", func(t *testing.T) {
+		v1 := []int{1, 2}
+		v2 := []int{2, 3}
+		want := []int{1, 2, 3}
+		got, err := DeepMerge(v1, v2, WithDefaultSliceSetUnionMerge())
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[]int append", func(t *testing.T) {
+		v1 := []int{1, 2}
+		v2 := []int{2, 3}
+		want := []int{1, 2, 2, 3}
+		got, err := DeepMerge(v1, v2, WithDefaultSliceListAppendMerge())
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[]foo custom", func(t *testing.T) {
+		v1 := []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}}
+		v2 := []foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}}
+		want := []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}}
+		got, err := DeepMerge(v1, v2, WithSliceMergeByID(reflect.TypeOf([]foo{}), "FieldInt"))
+		assert.Equal(t, want, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[]*int custom", func(t *testing.T) {
+		v1 := []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}}
+		v2 := []*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}}
+		want := []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}}
+		got, err := DeepMerge(v1, v2, WithSliceMergeByKeyFunc(
+			reflect.TypeOf([]*foo{}),
+			func(_ int, v reflect.Value) (reflect.Value, error) {
+				i := v.Interface()
+				return reflect.ValueOf(i.(*foo).FieldInt), nil
+			},
+		))
+		assert.Equal(t, want, got)
+		assertNotSame(t, v1, got)
+		assertNotSame(t, v2, got)
+		assert.NoError(t, err)
+	})
+	t.Run("[]*int type merger conflict", func(t *testing.T) {
+		v1 := []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}}
+		v2 := []*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}}
+		want := []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}}
+		got, err := DeepMerge(v1, v2,
+			WithSliceMergeByID(reflect.TypeOf([]*foo{}), "FieldInt"),
+			WithSliceListAppendMerge(reflect.TypeOf([]*foo{})), // will prevail
+		)
+		assert.Equal(t, want, got)
+		assertNotSame(t, v1, got)
+		assertNotSame(t, v2, got)
+		assert.NoError(t, err)
+	})
+	t.Run("interface", func(t *testing.T) {
+		var v1 Bird = &Duck{"Donald"}
+		var v2 Bird = &Duck{"Scrooge"}
+		called := false
+		// reflect.TypeOf(v1) is *goalesce.Duck, not Bird
+		got, err := DeepMerge(v1, v2, WithTypeMerger(reflect.TypeOf(v1), func(v1, v2 reflect.Value) (reflect.Value, error) {
+			called = true
+			return reflect.Value{}, nil
+		}))
+		assert.Equal(t, &Duck{"Scrooge"}, got)
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("interface type mismatch", func(t *testing.T) {
+		var v1 Bird = &Duck{"Donald"}
+		var v2 Bird = &Goose{"Scrooge"}
+		got, err := DeepMerge(v1, v2)
+		assert.Zero(t, got)
+		assert.EqualError(t, err, "types do not match: *goalesce.Duck != *goalesce.Goose")
+	})
+	t.Run("interface pointer", func(t *testing.T) {
+		var v1 Bird = &Duck{"Donald"}
+		var v2 Bird = &Duck{"Scrooge"}
+		called := false
+		// reflect.TypeOf(&v1).Elem() is Bird, not *goalesce.Duck
+		got, err := DeepMerge(&v1, &v2, WithTypeMerger(reflect.TypeOf(&v1).Elem(), func(v1, v2 reflect.Value) (reflect.Value, error) {
+			called = true
+			return reflect.Value{}, nil
+		}))
+		assert.Equal(t, &Duck{"Scrooge"}, *got)
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	trileanTests := []struct {
+		name string
+		v1   *bool
+		v2   *bool
+		opts []Option
+		want *bool
 	}{
-		{
-			name: "untyped nil",
-			v1:   nil,
-			v2:   nil,
-			want: nil,
-		},
-		{
-			name: "untyped nil partial 1",
-			v1:   1,
-			v2:   nil,
-			want: 1,
-		},
-		{
-			name: "untyped nil partial 2",
-			v1:   nil,
-			v2:   1,
-			want: 1,
-		},
-		{
-			name: "int",
-			v1:   1,
-			v2:   2,
-			want: 2,
-		},
-		{
-			name: "int zero partial 1",
-			v1:   1,
-			v2:   0,
-			want: 1,
-		},
-		{
-			name: "int zero partial 2",
-			v1:   0,
-			v2:   1,
-			want: 1,
-		},
-		{
-			name: "*int",
-			v1:   intPtr(1),
-			v2:   intPtr(2),
-			want: intPtr(2),
-		},
-		{
-			name: "*int zero",
-			v1:   (*int)(nil),
-			v2:   (*int)(nil),
-			want: (*int)(nil),
-		},
-		{
-			name: "*int zero partial 1",
-			v1:   intPtr(1),
-			v2:   (*int)(nil),
-			want: intPtr(1),
-		},
-		{
-			name: "nil *int partial 2",
-			v1:   (*int)(nil),
-			v2:   intPtr(1),
-			want: intPtr(1),
-		},
-		{
-			name: "string",
-			v1:   "a",
-			v2:   "b",
-			want: "b",
-		},
-		{
-			name: "string zero",
-			v1:   "a",
-			v2:   "",
-			want: "a",
-		},
-		{
-			name: "bool",
-			v1:   true,
-			v2:   false,
-			want: true,
-		},
-		{
-			name: "struct",
-			v1:   foo{FieldInt: 1},
-			v2:   foo{FieldInt: 2},
-			want: foo{FieldInt: 2},
-		},
-		{
-			name: "struct zero",
-			v1:   foo{},
-			v2:   foo{FieldInt: 0},
-			want: foo{},
-		},
-		{
-			name: "struct zero partial 1",
-			v1:   foo{FieldInt: 1},
-			v2:   foo{FieldInt: 0},
-			want: foo{FieldInt: 1},
-		},
-		{
-			name: "struct zero partial 2",
-			v1:   foo{FieldInt: 0},
-			v2:   foo{FieldInt: 1},
-			want: foo{FieldInt: 1},
-		},
-		{
-			name: "struct non zero",
-			v1:   bar{FieldInt: 0, FieldFoo: foo{FieldInt: 1}},
-			v2:   bar{FieldInt: 1},
-			want: bar{FieldInt: 1, FieldFoo: foo{FieldInt: 1}},
-		},
-		{
-			name: "struct non zero custom coalescer",
-			v1:   bar{FieldInt: 0, FieldFoo: foo{FieldInt: 1}},
-			v2:   bar{FieldInt: 1},
-			opts: []Option{WithAtomicMerge(reflect.TypeOf(bar{}))},
-			want: bar{FieldInt: 1},
-		},
-		{
-			name: "map[int]int",
-			v1:   map[int]int{1: 1, 3: 1},
-			v2:   map[int]int{1: 2, 2: 2},
-			want: map[int]int{1: 2, 2: 2, 3: 1},
-		},
-		{
-			name: "map[int]foo",
-			v1:   map[int]foo{1: {FieldInt: 1}, 3: {FieldInt: 3}},
-			v2:   map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}},
-			want: map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}, 3: {FieldInt: 3}},
-		},
-		{
-			name: "map[int]foo custom coalescer",
-			v1:   map[int]foo{1: {FieldInt: 1}, 3: {FieldInt: 3}},
-			v2:   map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}},
-			opts: []Option{WithAtomicMerge(reflect.TypeOf(map[int]foo{}))},
-			want: map[int]foo{1: {FieldInt: 2}, 2: {FieldInt: 2}},
-		},
-		{
-			name: "[]int",
-			v1:   []int{1, 3},
-			v2:   []int{1, 2},
-			want: []int{1, 2},
-		},
-		{
-			name: "[]foo",
-			v1:   []foo{{FieldInt: 1}, {FieldInt: 2}},
-			v2:   []foo{{FieldInt: 3}, {FieldInt: 4}},
-			want: []foo{{FieldInt: 3}, {FieldInt: 4}},
-		},
-		{
-			name: "[2]foo",
-			v1:   [2]foo{{FieldInt: 1}, {FieldInt: 2}},
-			v2:   [2]foo{{FieldInt: 3}, {FieldInt: 4}},
-			want: [2]foo{{FieldInt: 3}, {FieldInt: 4}},
-		},
-		{
-			name: "[]int union",
-			v1:   []int{1, 3},
-			v2:   []int{1, 2},
-			opts: []Option{WithDefaultSliceSetUnionMerge()},
-			want: []int{1, 3, 2},
-		},
-		{
-			name: "[]int append",
-			v1:   []int{1, 3},
-			v2:   []int{1, 2},
-			opts: []Option{WithDefaultSliceListAppendMerge()},
-			want: []int{1, 3, 1, 2},
-		},
-		{
-			name: "[]foo custom",
-			v1:   []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
-			v2:   []foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-			opts: []Option{WithSliceMergeByID(reflect.TypeOf([]foo{}), "FieldInt")},
-			want: []foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-		},
-		{
-			name: "[]*int custom",
-			v1:   []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
-			v2:   []*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-			opts: []Option{
-				WithSliceMergeByKeyFunc(
-					reflect.TypeOf([]*foo{}),
-					func(_ int, v reflect.Value) (reflect.Value, error) {
-						i := v.Interface()
-						return reflect.ValueOf(i.(*foo).FieldInt), nil
-					},
-				)},
-			want: []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-		},
-		{
-			name: "[]*int type merger",
-			v1:   []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}},
-			v2:   []*foo{{FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-			opts: []Option{
-				WithSliceMergeByID(reflect.TypeOf([]*foo{}), "FieldInt"),
-				WithSliceListAppendMerge(reflect.TypeOf([]*foo{}))}, // will prevail
-			want: []*foo{{FieldInt: 1}, {FieldInt: 2}, {FieldInt: 3}, {FieldInt: 3}, {FieldInt: 4}, {FieldInt: 5}},
-		},
 		{
 			name: "trilean nil nil",
 			v1:   (*bool)(nil),
@@ -306,51 +385,8 @@ func TestDeepMerge(t *testing.T) {
 			opts: []Option{WithTrileanMerge()},
 			want: boolPtr(true),
 		},
-		{
-			name: "type merger zero values",
-			v1:   "",
-			v2:   "",
-			opts: []Option{WithTypeMerger(reflect.TypeOf(""), weirdStringDeepMerge)},
-			want: "ZERO!ZERO!",
-		},
-		{
-			name: "type merger zero value 1",
-			v1:   "abc",
-			v2:   "",
-			opts: []Option{WithTypeMerger(reflect.TypeOf(""), weirdStringDeepMerge)},
-			want: "abcZERO!",
-		},
-		{
-			name: "type merger zero value 2",
-			v1:   "",
-			v2:   "def",
-			opts: []Option{WithTypeMerger(reflect.TypeOf(""), weirdStringDeepMerge)},
-			want: "ZERO!def",
-		},
-		{
-			name: "type merger non-zero values",
-			v1:   "abc",
-			v2:   "def",
-			opts: []Option{WithTypeMerger(reflect.TypeOf(""), weirdStringDeepMerge)},
-			want: "abcdef",
-		},
-		{
-			name: "type mismatch",
-			v1:   1,
-			v2:   "a",
-			wantErr: func(t assert.TestingT, err error, args ...interface{}) bool {
-				return assert.EqualError(t, err, "types do not match: int != string")
-			},
-		},
-		{
-			name:    "generic error",
-			v1:      map[int]int{1: 1},
-			v2:      map[int]int{1: 2},
-			opts:    []Option{withMockDeepMergeError},
-			wantErr: assert.Error,
-		},
 	}
-	for _, tt := range tests {
+	for _, tt := range trileanTests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := DeepMerge(tt.v1, tt.v2, tt.opts...)
 			if err == nil {
@@ -360,13 +396,72 @@ func TestDeepMerge(t *testing.T) {
 			} else {
 				assert.Nil(t, got)
 			}
-			if tt.wantErr != nil {
-				tt.wantErr(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			assert.NoError(t, err)
 		})
 	}
+	weirdStringMerger := func(v1, v2 reflect.Value) (reflect.Value, error) {
+		if v1.IsZero() {
+			v1 = reflect.ValueOf("ZERO!")
+		}
+		if v2.IsZero() {
+			v2 = reflect.ValueOf("ZERO!")
+		}
+		return reflect.ValueOf(v1.Interface().(string) + v2.Interface().(string)), nil
+	}
+	typeMergerTests := []struct {
+		name string
+		v1   string
+		v2   string
+		opts []Option
+		want string
+	}{
+		{
+			name: "type merger zero values",
+			v1:   "",
+			v2:   "",
+			opts: []Option{WithTypeMerger(reflect.TypeOf(""), weirdStringMerger)},
+			want: "ZERO!ZERO!",
+		},
+		{
+			name: "type merger zero value 1",
+			v1:   "abc",
+			v2:   "",
+			opts: []Option{WithTypeMerger(reflect.TypeOf(""), weirdStringMerger)},
+			want: "abcZERO!",
+		},
+		{
+			name: "type merger zero value 2",
+			v1:   "",
+			v2:   "def",
+			opts: []Option{WithTypeMerger(reflect.TypeOf(""), weirdStringMerger)},
+			want: "ZERO!def",
+		},
+		{
+			name: "type merger non-zero values",
+			v1:   "abc",
+			v2:   "def",
+			opts: []Option{WithTypeMerger(reflect.TypeOf(""), weirdStringMerger)},
+			want: "abcdef",
+		},
+	}
+	for _, tt := range typeMergerTests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := DeepMerge(tt.v1, tt.v2, tt.opts...)
+			if err == nil {
+				assert.Equal(t, tt.want, got)
+				assertNotSame(t, tt.v1, got)
+				assertNotSame(t, tt.v2, got)
+			} else {
+				assert.Nil(t, got)
+			}
+			assert.NoError(t, err)
+		})
+	}
+	t.Run("generic error", func(t *testing.T) {
+		got, err := DeepMerge("abc", "def", withMockDeepMergeError)
+		assert.Equal(t, "", got)
+		assert.EqualError(t, err, "mock DeepMerge error")
+	})
 }
 
 func TestMustDeepMerge(t *testing.T) {
@@ -379,51 +474,4 @@ func TestMustDeepMerge(t *testing.T) {
 	assert.PanicsWithError(t, "mock DeepMerge error", func() {
 		MustDeepMerge("abc", "def", withMockDeepMergeError)
 	})
-}
-
-func TestNewDeepMergeFunc(t *testing.T) {
-	t.Run("with generic option", func(t *testing.T) {
-		called := false
-		opt := func(c *coalescer) {
-			called = true
-		}
-		NewDeepMergeFunc(opt)
-		assert.True(t, called)
-	})
-	t.Run("generic error", func(t *testing.T) {
-		_, err := NewDeepMergeFunc(withMockDeepMergeError)(reflect.ValueOf(1), reflect.ValueOf("a"))
-		assert.EqualError(t, err, "mock DeepMerge error")
-	})
-	t.Run("type mismatches", func(t *testing.T) {
-		_, err := NewDeepMergeFunc()(reflect.ValueOf(1), reflect.ValueOf("a"))
-		assert.EqualError(t, err, "types do not match: int != string")
-		_, err = NewDeepMergeFunc()(reflect.ValueOf(map[string]int{"a": 2}), reflect.ValueOf(map[string]string{"a": "b"}))
-		assert.EqualError(t, err, "types do not match: map[string]int != map[string]string")
-		_, err = NewDeepMergeFunc()(reflect.ValueOf(intPtr(1)), reflect.ValueOf(stringPtr("a")))
-		assert.EqualError(t, err, "types do not match: *int != *string")
-		_, err = NewDeepMergeFunc()(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
-		assert.EqualError(t, err, "types do not match: []int != []string")
-		_, err = NewDeepMergeFunc()(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
-		assert.EqualError(t, err, "types do not match: []int != []string")
-		_, err = NewDeepMergeFunc()(reflect.ValueOf([]int{1}), reflect.ValueOf([]string{"a"}))
-		assert.EqualError(t, err, "types do not match: []int != []string")
-		type foo struct {
-			Int int
-		}
-		type bar struct {
-			Int int
-		}
-		_, err = NewDeepMergeFunc()(reflect.ValueOf(foo{}), reflect.ValueOf(bar{}))
-		assert.EqualError(t, err, "types do not match: goalesce.foo != goalesce.bar")
-	})
-}
-
-func weirdStringDeepMerge(v1, v2 reflect.Value) (reflect.Value, error) {
-	if v1.IsZero() {
-		v1 = reflect.ValueOf("ZERO!")
-	}
-	if v2.IsZero() {
-		v2 = reflect.ValueOf("ZERO!")
-	}
-	return reflect.ValueOf(v1.Interface().(string) + v2.Interface().(string)), nil
 }

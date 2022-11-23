@@ -20,6 +20,35 @@ import "reflect"
 // behavior.
 type Option func(c *coalescer)
 
+// DeepCopyFunc is a function for copying objects. A deep copy function is expected to abide by the
+// general contract of DeepCopy and to copy the given value to a newly-allocated value, avoiding
+// retaining references to passed objects. Note that the passed values can be zero-values, but will
+// never be invalid values. The returned value must be of same type as the passed value. By
+// convention, when the function returns an invalid value and a nil error, it is assumed that the
+// function is delegating the copy to the main copy function. See examples for more.
+type DeepCopyFunc func(v reflect.Value) (reflect.Value, error)
+
+// DeepMergeFunc is a function for merging objects. A deep merge function is expected to abide by
+// the general contract of DeepMerge and to merge the 2 values into a single value, favoring v2 over
+// v1 in case of conflicts. Note that the passed values can be zero-values, but will never be
+// invalid values. The passed values are guaranteed to be of the same type; the returned value must
+// also be of that same type. By convention, when the function returns an invalid value and a nil
+// error, it is assumed that the function is delegating the merge to the main merge function. See
+// examples for more.
+type DeepMergeFunc func(v1, v2 reflect.Value) (reflect.Value, error)
+
+// DeepCopyFuncProvider is a factory for DeepCopyFunc instances. It takes the main DeepCopyFunc
+// instance as argument. It allows to create type copiers that are able to delegate the copy of
+// nested values to that instance, instead of having to handle them internally. See examples for
+// more.
+type DeepCopyFuncProvider func(global DeepCopyFunc) DeepCopyFunc
+
+// DeepMergeFuncProvider is a factory for DeepMergeFunc instances. It takes the main DeepMergeFunc
+// and DeepCopyFunc instances as arguments. It allows to create type mergers that are able to
+// delegate the merge and copy of nested values to those instances, instead of having to handle them
+// internally. See examples for more.
+type DeepMergeFuncProvider func(globalMerger DeepMergeFunc, globalCopier DeepCopyFunc) DeepMergeFunc
+
 // COMMON OPTIONS
 
 // WithErrorOnCycle instructs the operation to return an error when a cycle is detected. By default,
@@ -32,19 +61,20 @@ func WithErrorOnCycle() Option {
 
 // DEEP COPY OPTIONS
 
-// WithTypeCopier will defer the copy of the given type to the given custom copier. This option
-// does not allow the type copier to access the parent DeepCopyFunc instance being created. For
-// that, use WithTypeCopierProvider instead.
+// WithTypeCopier will defer the copy of the given type to the given custom copier. This option does
+// not allow the type copier to access the global DeepCopyFunc instance. For that, use
+// WithTypeCopierProvider instead.
 func WithTypeCopier(t reflect.Type, copier DeepCopyFunc) Option {
-	return WithTypeCopierProvider(t, func(parent DeepCopyFunc) DeepCopyFunc {
+	return WithTypeCopierProvider(t, func(DeepCopyFunc) DeepCopyFunc {
 		return copier
 	})
 }
 
 // WithTypeCopierProvider will defer the copy of the given type to a custom copier that will be
-// obtained by calling the given provider function with the parent DeepCopyFunc instance being
-// created.
-func WithTypeCopierProvider(t reflect.Type, provider func(parent DeepCopyFunc) DeepCopyFunc) Option {
+// obtained by calling the given provider function with the global DeepCopyFunc instance. This
+// option allows the type copier to access this instance in order to delegate the copy of nested
+// objects. See ExampleWithTypeCopierProvider.
+func WithTypeCopierProvider(t reflect.Type, provider DeepCopyFuncProvider) Option {
 	return func(c *coalescer) {
 		c.typeCopiers[t] = provider(c.deepCopy)
 	}
@@ -83,20 +113,21 @@ func WithTrileanMerge() Option {
 }
 
 // WithTypeMerger will defer the merge of the given type to the given custom merger. This option
-// does not allow the type merger to access the parent DeepMergeFunc instance being created. For
+// does not allow the type merger to access the global DeepMergeFunc instance. For
 // that, use WithTypeMergerProvider instead.
 func WithTypeMerger(t reflect.Type, merger DeepMergeFunc) Option {
-	return WithTypeMergerProvider(t, func(parent DeepMergeFunc) DeepMergeFunc {
+	return WithTypeMergerProvider(t, func(DeepMergeFunc, DeepCopyFunc) DeepMergeFunc {
 		return merger
 	})
 }
 
 // WithTypeMergerProvider will defer the merge of the given type to a custom merger that will be
-// obtained by calling the given provider function with the parent DeepMergeFunc instance being
-// created.
-func WithTypeMergerProvider(t reflect.Type, provider func(parent DeepMergeFunc) DeepMergeFunc) Option {
+// obtained by calling the given provider function with the global DeepMergeFunc and DeepCopyFunc
+// instances. This option allows the type merger to access those instances in order to delegate the
+// merge and copy of nested objects. See ExampleWithTypeMergerProvider.
+func WithTypeMergerProvider(t reflect.Type, provider DeepMergeFuncProvider) Option {
 	return func(c *coalescer) {
-		c.typeMergers[t] = provider(c.deepMerge)
+		c.typeMergers[t] = provider(c.deepMerge, c.deepCopy)
 	}
 }
 
@@ -201,21 +232,21 @@ func WithSliceMergeByKeyFunc(sliceType reflect.Type, mergeKeyFunc SliceMergeKeyF
 // allow the type merger to access the parent DeepMergeFunc instance being created. For that, use
 // WithFieldMergerProvider instead.
 func WithFieldMerger(structType reflect.Type, field string, merger DeepMergeFunc) Option {
-	return WithFieldMergerProvider(structType, field, func(parent DeepMergeFunc) DeepMergeFunc {
+	return WithFieldMergerProvider(structType, field, func(DeepMergeFunc, DeepCopyFunc) DeepMergeFunc {
 		return merger
 	})
 }
 
 // WithFieldMergerProvider merges the given struct field with a custom merger that will be obtained
-// by calling the given provider function with the DeepMergeFunc instance being created. This option
-// allows the type merger to access the parent DeepMergeFunc instance being created. See
-// ExampleWithFieldMergerProvider.
-func WithFieldMergerProvider(structType reflect.Type, field string, provider func(parent DeepMergeFunc) DeepMergeFunc) Option {
+// by calling the given provider function with the global DeepMergeFunc and DeepCopyFunc instances.
+// This option allows the type merger to access those instances in order to delegate the merge and
+// copy of nested objects. See ExampleWithFieldMergerProvider.
+func WithFieldMergerProvider(structType reflect.Type, field string, provider DeepMergeFuncProvider) Option {
 	return func(c *coalescer) {
 		if c.fieldMergers[structType] == nil {
 			c.fieldMergers[structType] = make(map[string]DeepMergeFunc)
 		}
-		c.fieldMergers[structType][field] = provider(c.deepMerge)
+		c.fieldMergers[structType][field] = provider(c.deepMerge, c.deepCopy)
 	}
 }
 

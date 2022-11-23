@@ -81,22 +81,22 @@ func (c *coalescer) deepMergeSliceWithListAppend(v1, v2 reflect.Value) (reflect.
 		return c.deepCopy(v2)
 	}
 	l := v1.Len() + v2.Len()
-	coalesced := reflect.MakeSlice(v1.Type(), l, l)
+	merged := reflect.MakeSlice(v1.Type(), l, l)
 	for i := 0; i < v1.Len(); i++ {
 		elem, err := c.deepCopy(v1.Index(i))
 		if err != nil {
 			return reflect.Value{}, err
 		}
-		coalesced.Index(i).Set(elem)
+		merged.Index(i).Set(elem)
 	}
 	for i := 0; i < v2.Len(); i++ {
 		elem, err := c.deepCopy(v2.Index(i))
 		if err != nil {
 			return reflect.Value{}, err
 		}
-		coalesced.Index(v1.Len() + i).Set(elem)
+		merged.Index(v1.Len() + i).Set(elem)
 	}
-	return coalesced, nil
+	return merged, nil
 }
 
 var typeOfInterface = reflect.TypeOf((*interface{})(nil)).Elem()
@@ -157,11 +157,11 @@ func (c *coalescer) deepMergeSliceWithMergeKey(v1, v2 reflect.Value, mergeKeyFun
 	}
 	for _, k := range m2.MapKeys() {
 		if m1.MapIndex(k).IsValid() {
-			coalescedValue, err := c.deepMerge(m1.MapIndex(k), m2.MapIndex(k))
+			mergedValue, err := c.deepMerge(m1.MapIndex(k), m2.MapIndex(k))
 			if err != nil {
 				return reflect.Value{}, err
 			}
-			m.SetMapIndex(k, coalescedValue)
+			m.SetMapIndex(k, mergedValue)
 		} else {
 			copiedValue, err := c.deepCopy(m2.MapIndex(k))
 			if err != nil {
@@ -170,14 +170,14 @@ func (c *coalescer) deepMergeSliceWithMergeKey(v1, v2 reflect.Value, mergeKeyFun
 			m.SetMapIndex(k, copiedValue)
 		}
 	}
-	coalesced := reflect.MakeSlice(v1.Type(), 0, 0)
+	merged := reflect.MakeSlice(v1.Type(), 0, 0)
 	for i := 0; i < keys.Len(); i++ {
 		k := keys.Index(i)
 		if m.MapIndex(k).IsValid() {
-			coalesced = reflect.Append(coalesced, m.MapIndex(k))
+			merged = reflect.Append(merged, m.MapIndex(k))
 		}
 	}
-	return coalesced, nil
+	return merged, nil
 }
 
 func checkMergeKey(k reflect.Value) error {

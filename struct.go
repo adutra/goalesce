@@ -37,9 +37,7 @@ const (
 )
 
 func (c *coalescer) deepMergeStruct(v1, v2 reflect.Value) (reflect.Value, error) {
-	if value, done := checkZero(v1, v2); done {
-		return c.deepCopy(value)
-	}
+	// don't check for zero values as we may have custom field mergers
 	merged := reflect.New(v1.Type()).Elem()
 	for i := 0; i < v1.NumField(); i++ {
 		field := v1.Type().Field(i)
@@ -81,7 +79,15 @@ func (c *coalescer) fieldMerger(structType reflect.Type, field reflect.StructFie
 	}
 	if fieldMerger == nil {
 		if fieldMergers, found := c.fieldMergers[structType]; found {
-			fieldMerger = fieldMergers[field.Name]
+			if customFieldMerger, found := fieldMergers[field.Name]; found {
+				fieldMerger = func(v1, v2 reflect.Value) (reflect.Value, error) {
+					merged, err := customFieldMerger(v1, v2)
+					if done, merged, err := checkCustomResult(merged, err, v1.Type()); done {
+						return merged, err
+					}
+					return c.deepMerge(v1, v2)
+				}
+			}
 		}
 	}
 	if fieldMerger == nil {

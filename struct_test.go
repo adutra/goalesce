@@ -289,15 +289,21 @@ func Test_coalescer_deepMergeStruct(t *testing.T) {
 	t.Run("options", func(t *testing.T) {
 		t.Run("field merger", func(t *testing.T) {
 			type foo struct {
-				FieldInts []int
+				Int int
 			}
 			fieldMerger := func(v1, v2 reflect.Value) (reflect.Value, error) {
-				return reflect.ValueOf([]int{1, 2, 3}), nil
+				if v2.Int() == 0 {
+					return reflect.Value{}, nil // delegate the merge to the default merger
+				}
+				return reflect.ValueOf((int)(v1.Int() / v2.Int())), nil
 			}
-			c := newCoalescer(WithFieldMerger(reflect.TypeOf(foo{}), "FieldInts", fieldMerger))
-			got, err := c.deepMergeStruct(reflect.ValueOf(foo{FieldInts: []int{1, 2}}), reflect.ValueOf(foo{FieldInts: []int{2, 3}}))
+			c := newCoalescer(WithFieldMerger(reflect.TypeOf(foo{}), "Int", fieldMerger))
+			got, err := c.deepMergeStruct(reflect.ValueOf(foo{6}), reflect.ValueOf(foo{2}))
 			require.NoError(t, err)
-			assert.Equal(t, foo{FieldInts: []int{1, 2, 3}}, got.Interface())
+			assert.Equal(t, foo{3}, got.Interface())
+			got, err = c.deepMergeStruct(reflect.ValueOf(foo{6}), reflect.ValueOf(foo{0}))
+			require.NoError(t, err)
+			assert.Equal(t, foo{6}, got.Interface())
 		})
 		t.Run("field merger provider", func(t *testing.T) {
 			type foo struct {
@@ -306,7 +312,7 @@ func Test_coalescer_deepMergeStruct(t *testing.T) {
 			fieldMerger := func(v1, v2 reflect.Value) (reflect.Value, error) {
 				return reflect.ValueOf([]int{1, 2, 3}), nil
 			}
-			c := newCoalescer(WithFieldMergerProvider(reflect.TypeOf(foo{}), "FieldInts", func(parent DeepMergeFunc) DeepMergeFunc {
+			c := newCoalescer(WithFieldMergerProvider(reflect.TypeOf(foo{}), "FieldInts", func(DeepMergeFunc, DeepCopyFunc) DeepMergeFunc {
 				return fieldMerger
 			}))
 			got, err := c.deepMergeStruct(reflect.ValueOf(foo{FieldInts: []int{1, 2}}), reflect.ValueOf(foo{FieldInts: []int{2, 3}}))
@@ -505,13 +511,14 @@ func Test_coalescer_deepMergeStruct(t *testing.T) {
 			})
 		}
 	})
-	t.Run("field merge errors", func(t *testing.T) {
+	t.Run("interface field", func(t *testing.T) {
 		type foo struct {
-			FieldInterface interface{}
+			Bird Bird
 		}
 		c := newCoalescer()
-		_, err := c.deepMergeStruct(reflect.ValueOf(foo{FieldInterface: 123}), reflect.ValueOf(foo{FieldInterface: "abc"}))
-		assert.EqualError(t, err, "types do not match: int != string")
+		merged, err := c.deepMergeStruct(reflect.ValueOf(foo{Bird: &Duck{"Donald"}}), reflect.ValueOf(foo{Bird: &Goose{"Scrooge"}}))
+		assert.Equal(t, foo{Bird: &Goose{"Scrooge"}}, merged.Interface())
+		assert.NoError(t, err)
 	})
 	t.Run("generic error", func(t *testing.T) {
 		type foo struct {

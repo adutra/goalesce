@@ -12,16 +12,14 @@ of object, including structs, maps, arrays and slices, even nested ones.
 
 The main entry points are the `DeepCopy` and `DeepMerge` functions:
 
-    func DeepCopy  (o      interface{}, opts ...Option) (copied interface{}, err error)
-    func DeepMerge (o1, o2 interface{}, opts ...Option) (merged interface{}, err error)
+    func DeepCopy  [T any](     o T, opts ...Option) (T, error)
+    func DeepMerge [T any](o1, o2 T, opts ...Option) (T, error)
 
 `DeepCopy`, as the name implies, copies the given object and returns the copy. The copy is "deep" in
-the sense that it copies all the fields and elements of the object, even if they are themselves
-objects.
+the sense that it copies all the fields and elements of the object recursively.
 
-`DeepMerge` merges the 2 values into a single value and returns that value. Again, the merge is
-"deep" and will merge all the fields and elements of the object, even if they are themselves
-objects.
+`DeepMerge` merges the two values into a single value and returns that value. Again, the merge is
+"deep" and will merge all the fields and elements of the object recursively.
 
 When called with no options, `DeepMerge` uses the following merge algorithm:
 
@@ -81,6 +79,8 @@ Output:
 
     DeepCopy({ID:1 Name:Alice}) = {ID:1 Name:Alice}
 
+Only exported fields can be copied. Unexported fields are ignored.
+
 ### Copying pointers
 
 The copied pointer never points to the same memory address; the pointer target is deep-copied:
@@ -125,23 +125,23 @@ Output:
 
 ### Custom copiers
 
-The option `WithTypeCopier` can be used to delegate the copying of a given type to a custom function:
+The option `WithTypeCopier` can be used to delegate the copying of a given type to a custom
+function:
 
 ```go
-userCopier := func(v reflect.Value) (reflect.Value, error) {
-    if v.FieldByName("ID").Int() == 1 {
-        return reflect.Value{}, errors.New("user 1 has been deleted")
-    }
-    return reflect.Value{}, nil // delegate to default copier
+negatingCopier := func(v reflect.Value) (reflect.Value, error) {
+    result := reflect.New(v.Type()).Elem()
+    result.SetInt(-v.Int())
+    return result, nil
 }
-v := User{ID: 1, Name: "Alice"}
-copied, err := goalesce.DeepCopy(v, goalesce.WithTypeCopier(reflect.TypeOf(User{}), userCopier))
+v := 1
+copied, err := goalesce.DeepCopy(v, goalesce.WithTypeCopier(reflect.TypeOf(v), negatingCopier))
 fmt.Printf("DeepCopy(%+v, WithTypeCopier) = %+v, %v\n", v, copied, err)
 ```
 
 Output:
 
-    DeepCopy({ID:1 Name:Alice Age:0}, WithTypeCopier) = <nil>, user 1 has been deleted
+    DeepCopy(1, WithTypeCopier) = -1, <nil>
 
 ## Using DeepMerge 
 
@@ -194,10 +194,37 @@ Output:
 
     DeepMerge(map[1:a 2:b], map[2:c 3:d]) = map[1:a 2:c 3:d]
 
+### Merging interfaces
+
+When both interfaces are non-zero-values, the default behavior is to merge their runtime values
+recursively.
+
+```go
+type Bird interface {
+    Chirp()
+}
+type Duck struct {
+    Name string
+}
+func (d *Duck) Chirp() {
+    println("quack")
+}
+v1 := Bird(&Duck{Name: "Donald"})
+v2 := Bird(&Duck{Name: "Scrooge"})
+merged, _ = goalesce.DeepMerge(v1, v2)
+fmt.Printf("DeepMerge(%+v, %+v) = %+v\n", v1, v2, merged)
+```
+
+Output:
+
+    DeepMerge(&{Name:Donald}, &{Name:Scrooge}) = &{Name:Scrooge}
+
+If the two values have different runtime types, an error is returned.
+
 ### Merging slices and arrays
 
 When both slices or arrays are non-zero-values, the default behavior is to apply atomic semantics,
-that is, to _replace_ the first slice with the second one:
+that is, to _replace_ the first slice or array with the second one:
 
 ```go
 v1 := []int{1, 2}
@@ -213,7 +240,9 @@ Output:
 This is indeed the safest choice when merging slices and arrays, but other merging strategies can be
 used (see below).
 
-Note: an empty slice is _not_ a zero-value for a slice. Therefore, when the second slice is an empty
+#### Treating empty slices as zero-values
+
+An empty slice is _not_ a zero-value for a slice. Therefore, when the second slice is an empty
 slice, an empty slice is returned:
 
 ```go
@@ -226,8 +255,6 @@ fmt.Printf("DeepMerge(%v, %v) = %v\n", v1, v2, merged)
 Output:
 
     DeepMerge([1 2], []) = []
-
-#### Treating empty slices as zero-values
 
 To consider empty slices as zero-values, use the `WithZeroEmptySlice` option. This changes the
 default behavior: when merging a non-empty slice with an empty slice, normally the empty slice is
@@ -437,6 +464,8 @@ Output:
 
     DeepMerge({ID:1 Name:Alice}, {ID:1 Age:20}) = {ID:1 Name:Alice Age:20}
 
+Only exported fields can be merged. Unexported fields are ignored.
+
 #### Per-field merging strategies
 
 When the default struct merging behavior is not desired or sufficient, per-field merging strategies
@@ -453,7 +482,7 @@ The struct tag `goalesce` allows to specify the following per-field strategies:
 | `id`     | Slice of struct fields | Applies "merge-by-id" semantics.    |   
 
 With the `id` strategy, a merge key must also be provided, separated by a colon from the strategy
-name itself, e.g. `goalesce:"id:ID"`.  The merge key _must_ be the name of an exported field in the
+name itself, e.g. `goalesce:"id:ID"`. The merge key _must_ be the name of an exported field in the
 slice's struct element type.
 
 Example:
@@ -550,59 +579,59 @@ See the [online documentation](https://pkg.go.dev/github.com/adutra/goalesce?tab
 
 The following options allow to pass a custom merger to the `DeepMerge` function:
 
-* The `WithTypeMerger` option can be used to coalesce a given type with a custom merger.
-* The `WithFieldMerger` option can be used to coalesce a given struct field with a custom merger.
+* The `WithTypeMerger` option can be used to merge a given type with a custom merger.
+* The `WithFieldMerger` option can be used to merge a given struct field with a custom merger.
 
 Here is an example showcasing `WithTypeMerger`:
 
 ```go
-userMerger := func(v1, v2 reflect.Value) (reflect.Value, error) {
-    if v1.FieldByName("ID").Int() == 1 {
-        return reflect.Value{}, errors.New("user 1 has been deleted")
-    }
-    return reflect.Value{}, nil // delegate to default merger
+summingMerger := func(v1, v2 reflect.Value) (reflect.Value, error) {
+    result := reflect.New(v1.Type()).Elem()
+    result.SetInt(v1.Int() + v2.Int())
+    return result, nil
 }
-v1 := User{ID: 1, Name: "Alice"}
-v2 := User{ID: 1, Age: 20}
-coalesced, err := goalesce.DeepMerge(v1, v2, goalesce.WithTypeMerger(reflect.TypeOf(User{}), userMerger))
-fmt.Printf("DeepMerge(%+v, %+v, WithTypeMerger) = %+v, %v\n", v1, v2, coalesced, err)
+v1 := 1
+v2 := 2
+merged, err := goalesce.DeepMerge(v1, v2, goalesce.WithTypeMerger(reflect.TypeOf(v1), summingMerger))
+fmt.Printf("DeepMerge(%+v, %+v, WithTypeMerger) = %+v, %v\n", v1, v2, merged, err)
 ```
 
 Output:
 
-    DeepMerge({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithTypeMerger) = <nil>, user 1 has been deleted
+    DeepMerge(1, 2, WithTypeMerger) = 3, <nil>
 
-It gets a bit more involved when the custom merger needs to access its parent merger, for example,
-to delegate the merging of child values.
+It gets a bit more involved when the custom merger needs to access the global merge function, for
+example, to delegate the merging of child values.
 
 For these cases, there are 2 other options:
 
-* The `WithTypeMergerProvider` option can be used to coalesce a given type with a custom
+* The `WithTypeMergerProvider` option can be used to merge a given type with a custom
   `DeepMergeFunc`.
-* The `WithFieldMergerProvider` option can be used to coalesce a given struct field with a custom
+* The `WithFieldMergerProvider` option can be used to merge a given struct field with a custom
   `DeepMergeFunc`.
 
-The above options give the custom merger access to the parent merger. Here is an example showcasing
-`WithFieldMergerProvider`:
+The above options give the custom merger access to the parent merger and the parent copier. 
+
+Here is an example showcasing `WithFieldMergerProvider`:
 
 ```go
-userMergerProvider := func(parent goalesce.DeepMergeFunc) goalesce.DeepMergeFunc {
+userMergerProvider := func(globalMerger goalesce.DeepMergeFunc, globalCopier goalesce.DeepCopyFunc) goalesce.DeepMergeFunc {
     return func(v1, v2 reflect.Value) (reflect.Value, error) {
         if v1.Int() == 1 {
             return reflect.Value{}, errors.New("user 1 has been deleted")
         }
-        return parent(v1, v2) // use parent merger
+        return globalMerger(v1, v2) // use global merger for other values
     }
 }
 v1 := User{ID: 1, Name: "Alice"}
 v2 := User{ID: 1, Age: 20}
-coalesced, err := goalesce.DeepMerge(v1, v2, goalesce.WithFieldMergerProvider(reflect.TypeOf(User{}), "ID", userMergerProvider))
-fmt.Printf("DeepMerge(%+v, %+v, WithFieldMergerProvider) = %+v, %v\n", v1, v2, coalesced, err)
+merged, err := goalesce.DeepMerge(v1, v2, goalesce.WithFieldMergerProvider(reflect.TypeOf(User{}), "ID", userMergerProvider))
+fmt.Printf("DeepMerge(%+v, %+v, WithFieldMergerProvider) = %+v, %v\n", v1, v2, merged, err)
 ```
 
 Output:
 
-    DeepMerge({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithFieldMergerProvider) = <nil>, user 1 has been deleted
+    DeepMerge({ID:1 Name:Alice Age:0}, {ID:1 Name: Age:20}, WithFieldMergerProvider) = {ID:0 Name: Age:0}, user 1 has been deleted
 
 
 [GoDocImg]: https://img.shields.io/badge/docs-golang-blue.svg

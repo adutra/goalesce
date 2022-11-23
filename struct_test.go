@@ -511,13 +511,14 @@ func Test_coalescer_deepMergeStruct(t *testing.T) {
 			})
 		}
 	})
-	t.Run("field merge errors", func(t *testing.T) {
+	t.Run("interface field", func(t *testing.T) {
 		type foo struct {
-			FieldInterface interface{}
+			Bird Bird
 		}
 		c := newCoalescer()
-		_, err := c.deepMergeStruct(reflect.ValueOf(foo{FieldInterface: 123}), reflect.ValueOf(foo{FieldInterface: "abc"}))
-		assert.EqualError(t, err, "types do not match: int != string")
+		merged, err := c.deepMergeStruct(reflect.ValueOf(foo{Bird: &Duck{"Donald"}}), reflect.ValueOf(foo{Bird: &Goose{"Scrooge"}}))
+		assert.Equal(t, foo{Bird: &Goose{"Scrooge"}}, merged.Interface())
+		assert.NoError(t, err)
 	})
 	t.Run("generic error", func(t *testing.T) {
 		type foo struct {

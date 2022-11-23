@@ -20,6 +20,10 @@ func (c *coalescer) deepMergeInterface(v1, v2 reflect.Value) (reflect.Value, err
 	if value, done := checkZero(v1, v2); done {
 		return c.deepCopy(value)
 	}
+	if v1.Elem().Type() != v2.Elem().Type() {
+		// the two interfaces are implemented by different runtime types, so we can't merge them
+		return c.deepCopy(v2)
+	}
 	mergedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
 	if err != nil {
 		return reflect.Value{}, err

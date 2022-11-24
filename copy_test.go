@@ -107,6 +107,13 @@ func TestDeepCopy(t *testing.T) {
 		assertNotSame(t, x, got)
 		assert.NoError(t, err)
 	})
+	t.Run("map[int]*int atomic", func(t *testing.T) {
+		v := map[int]*int{1: intPtr(1)}
+		got, err := DeepCopy(v, WithAtomicCopy(reflect.TypeOf(map[int]*int{})))
+		assert.Equal(t, v, got)
+		assert.Same(t, v[1], got[1])
+		assert.NoError(t, err)
+	})
 	t.Run("struct", func(t *testing.T) {
 		type foo struct {
 			FieldInt    int
@@ -131,6 +138,16 @@ func TestDeepCopy(t *testing.T) {
 			FieldMap:    map[string]int{"a": 1, "b": 2, "c": 3},
 		}, got)
 		assertNotSame(t, x, got)
+		assert.NoError(t, err)
+	})
+	t.Run("struct atomic", func(t *testing.T) {
+		type foo struct {
+			A *int
+		}
+		v := foo{A: intPtr(1)}
+		got, err := DeepCopy(v, WithAtomicCopy(reflect.TypeOf(foo{})))
+		assert.Equal(t, v, got)
+		assert.Same(t, v.A, got.A)
 		assert.NoError(t, err)
 	})
 	t.Run("with type copier", func(t *testing.T) {

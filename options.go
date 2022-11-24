@@ -61,6 +61,14 @@ func WithErrorOnCycle() Option {
 
 // DEEP COPY OPTIONS
 
+// WithAtomicCopy causes the given type to be copied with atomic semantics, instead of its default
+// copy semantics. When a non-zero value of this type is copied, the value is returned as is.
+func WithAtomicCopy(t reflect.Type) Option {
+	return func(c *coalescer) {
+		c.typeCopiers[t] = c.deepCopyAtomic
+	}
+}
+
 // WithTypeCopier will defer the copy of the given type to the given custom copier. This option does
 // not allow the type copier to access the global DeepCopyFunc instance. For that, use
 // WithTypeCopierProvider instead.
@@ -82,9 +90,10 @@ func WithTypeCopierProvider(t reflect.Type, provider DeepCopyFuncProvider) Optio
 
 // DEEP MERGE OPTIONS
 
-// WithAtomicMerge causes the given type to be merged atomically, that is, with  "atomic" semantics,
-// instead of its default merge semantics. When 2 non-zero-values of this type are merged, the
-// second value is returned as is.
+// WithAtomicMerge causes the given type to be merged with atomic semantics, instead of its default
+// merge semantics. When 2 non-zero-values of this type are merged, the second value is returned as
+// is. Note that this option does not modify the copy behavior for the type; if atomic semantics are
+// also needed when copying (which is usually the case), use both this option and WithAtomicCopy.
 func WithAtomicMerge(t reflect.Type) Option {
 	return func(c *coalescer) {
 		c.typeMergers[t] = c.deepMergeAtomic

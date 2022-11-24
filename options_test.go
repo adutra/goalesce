@@ -88,11 +88,23 @@ func TestWithTypeCopierProvider(t *testing.T) {
 	assert.Equal(t, 2, called)
 }
 
+func TestWithAtomicCopy(t *testing.T) {
+	v := intPtr(1)
+	c := newCoalescer(WithAtomicCopy(reflect.TypeOf(v)))
+	assert.NotNil(t, c.typeCopiers[reflect.TypeOf(v)])
+	got, err := c.deepCopy(reflect.ValueOf(v))
+	assert.Same(t, v, got.Interface())
+	assert.NoError(t, err)
+}
+
 func TestWithAtomicMerge(t *testing.T) {
-	c := newCoalescer(WithAtomicMerge(reflect.TypeOf(map[string]int{})))
-	assert.NotNil(t, c.typeMergers[reflect.TypeOf(map[string]int{})])
-	got, err := c.deepMerge(reflect.ValueOf(map[string]int{"a": 1}), reflect.ValueOf(map[string]int{"b": 2}))
-	assert.Equal(t, map[string]int{"b": 2}, got.Interface())
+	v1 := intPtr(1)
+	v2 := intPtr(0)
+	c := newCoalescer(WithAtomicMerge(reflect.TypeOf(v1)))
+	assert.NotNil(t, c.typeMergers[reflect.TypeOf(v1)])
+	got, err := c.deepMerge(reflect.ValueOf(v1), reflect.ValueOf(v2))
+	assert.Equal(t, v2, got.Interface())
+	assert.NotSame(t, v2, got.Interface())
 	assert.NoError(t, err)
 }
 

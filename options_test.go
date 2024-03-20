@@ -58,17 +58,75 @@ func withMockDeepMergeErrorWhen(expected1, expected2 interface{}) Option {
 }
 
 func TestWithTypeCopier(t *testing.T) {
-	called := false
-	c := newCoalescer(
-		WithTypeCopier(reflect.TypeOf(map[string]int{}), func(v reflect.Value) (reflect.Value, error) {
-			called = true
-			return v, nil
-		}))
-	assert.NotNil(t, c.typeCopiers[reflect.TypeOf(map[string]int{})])
-	got, err := c.deepCopy(reflect.ValueOf(map[string]int{"a": 1}))
-	assert.Equal(t, map[string]int{"a": 1}, got.Interface())
-	assert.NoError(t, err)
-	assert.True(t, called)
+	t.Run("map", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf(map[string]int{}), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}))
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf(map[string]int{})])
+		got, err := c.deepCopy(reflect.ValueOf(map[string]int{"a": 1}))
+		assert.Equal(t, map[string]int{"a": 1}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("struct", func(t *testing.T) {
+		called := false
+		type User struct {
+			ID string
+		}
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf(User{}), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}))
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf(User{})])
+		got, err := c.deepCopy(reflect.ValueOf(User{"Alice"}))
+		assert.Equal(t, User{"Alice"}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("pointer", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf(intPtr(0)), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}))
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf(intPtr(0))])
+		got, err := c.deepCopy(reflect.ValueOf(intPtr(0)))
+		assert.Equal(t, intPtr(0), got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("slice", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf([]int{}), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}))
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf([]int{})])
+		got, err := c.deepCopy(reflect.ValueOf([]int{1}))
+		assert.Equal(t, []int{1}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+
+	})
+	t.Run("array", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf([2]int{}), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}))
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf([2]int{})])
+		got, err := c.deepCopy(reflect.ValueOf([2]int{1, 2}))
+		assert.Equal(t, [2]int{1, 2}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
 }
 
 func TestWithTypeCopierProvider(t *testing.T) {
@@ -117,17 +175,214 @@ func TestWithTrileanMerge(t *testing.T) {
 }
 
 func TestWithTypeMerger(t *testing.T) {
-	called := false
-	c := newCoalescer(
-		WithTypeMerger(reflect.TypeOf(map[string]int{}), func(v1, v2 reflect.Value) (reflect.Value, error) {
-			called = true
-			return v2, nil
-		}))
-	assert.NotNil(t, c.typeMergers[reflect.TypeOf(map[string]int{})])
-	got, err := c.deepMerge(reflect.ValueOf(map[string]int{"a": 1}), reflect.ValueOf(map[string]int{"b": 2}))
-	assert.Equal(t, map[string]int{"b": 2}, got.Interface())
-	assert.NoError(t, err)
-	assert.True(t, called)
+	t.Run("map", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeMerger(reflect.TypeOf(map[string]int{}), func(v1, v2 reflect.Value) (reflect.Value, error) {
+				called = true
+				return v2, nil
+			}))
+		assert.NotNil(t, c.typeMergers[reflect.TypeOf(map[string]int{})])
+		got, err := c.deepMerge(reflect.ValueOf(map[string]int{"a": 1}), reflect.ValueOf(map[string]int{"b": 2}))
+		assert.Equal(t, map[string]int{"b": 2}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("struct", func(t *testing.T) {
+		called := false
+		type User struct {
+			ID string
+		}
+		c := newCoalescer(
+			WithTypeMerger(reflect.TypeOf(User{}), func(v1, v2 reflect.Value) (reflect.Value, error) {
+				called = true
+				return v2, nil
+			}))
+		assert.NotNil(t, c.typeMergers[reflect.TypeOf(User{})])
+		got, err := c.deepMerge(reflect.ValueOf(User{"Alice"}), reflect.ValueOf(User{"Bob"}))
+		assert.Equal(t, User{"Bob"}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("pointer", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeMerger(reflect.TypeOf(intPtr(0)), func(v1, v2 reflect.Value) (reflect.Value, error) {
+				called = true
+				return v2, nil
+			}))
+		assert.NotNil(t, c.typeMergers[reflect.TypeOf(intPtr(0))])
+		got, err := c.deepMerge(reflect.ValueOf(intPtr(1)), reflect.ValueOf(intPtr(0)))
+		assert.Equal(t, intPtr(0), got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("slice", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeMerger(reflect.TypeOf([]int{}), func(v1, v2 reflect.Value) (reflect.Value, error) {
+				called = true
+				return v2, nil
+			}))
+		assert.NotNil(t, c.typeMergers[reflect.TypeOf([]int{})])
+		got, err := c.deepMerge(reflect.ValueOf([]int{1}), reflect.ValueOf([]int{2}))
+		assert.Equal(t, []int{2}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("array", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeMerger(reflect.TypeOf([2]int{}), func(v1, v2 reflect.Value) (reflect.Value, error) {
+				called = true
+				return v2, nil
+			}))
+		assert.NotNil(t, c.typeMergers[reflect.TypeOf([2]int{})])
+		got, err := c.deepMerge(reflect.ValueOf([2]int{1, 2}), reflect.ValueOf([2]int{2, 3}))
+		assert.Equal(t, [2]int{2, 3}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+}
+
+func TestMergeZeroValueWithTypeCopier(t *testing.T) {
+	t.Run("map", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf(map[string]int{}), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}))
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf(map[string]int{})])
+		got, err := c.deepMerge(reflect.ValueOf(map[string]int{"a": 1}), reflect.ValueOf(map[string]int(nil)))
+		assert.Equal(t, map[string]int{"a": 1}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+		called = false
+		got, err = c.deepMerge(reflect.ValueOf(map[string]int(nil)), reflect.ValueOf(map[string]int{"a": 1}))
+		assert.Equal(t, map[string]int{"a": 1}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("slice", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf([]int{}), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}))
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf([]int{})])
+		got, err := c.deepMerge(reflect.ValueOf([]int{1}), reflect.ValueOf([]int(nil)))
+		assert.Equal(t, []int{1}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+		called = false
+		got, err = c.deepMerge(reflect.ValueOf([]int(nil)), reflect.ValueOf([]int{1}))
+		assert.Equal(t, []int{1}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("struct", func(t *testing.T) {
+		called := false
+		type User struct {
+			ID string
+		}
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf(User{}), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}))
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf(User{})])
+		got, err := c.deepMerge(reflect.ValueOf(User{"Alice"}), reflect.ValueOf(User{}))
+		assert.Equal(t, User{"Alice"}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+		called = false
+		got, err = c.deepMerge(reflect.ValueOf(User{}), reflect.ValueOf(User{"Alice"}))
+		assert.Equal(t, User{"Alice"}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("struct with field merger", func(t *testing.T) {
+		// edge case: struct has field merger, but there is also a type copier for it:
+		// type copier will not be called when merging zero with non-zero
+		called := false
+		type User struct {
+			ID string `goalesce:"atomic"`
+		}
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf(User{}), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}))
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf(User{})])
+		got, err := c.deepMerge(reflect.ValueOf(User{"Alice"}), reflect.ValueOf(User{}))
+		assert.Equal(t, User{"Alice"}, got.Interface())
+		assert.NoError(t, err)
+		assert.False(t, called)
+		called = false
+		got, err = c.deepMerge(reflect.ValueOf(User{}), reflect.ValueOf(User{"Alice"}))
+		assert.Equal(t, User{"Alice"}, got.Interface())
+		assert.NoError(t, err)
+		assert.False(t, called)
+	})
+	t.Run("pointer", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf(intPtr(0)), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}),
+		)
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf(intPtr(0))])
+		got, err := c.deepMerge(reflect.ValueOf((*int)(nil)), reflect.ValueOf(intPtr(1)))
+		assert.Equal(t, intPtr(1), got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+		called = false
+		got, err = c.deepMerge(reflect.ValueOf(intPtr(1)), reflect.ValueOf((*int)(nil)))
+		assert.Equal(t, intPtr(1), got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("slice", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf([]int{}), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}),
+		)
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf([]int{})])
+		got, err := c.deepMerge(reflect.ValueOf([]int{1}), reflect.ValueOf([]int(nil)))
+		assert.Equal(t, []int{1}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+		called = false
+		got, err = c.deepMerge(reflect.ValueOf([]int(nil)), reflect.ValueOf([]int{1}))
+		assert.Equal(t, []int{1}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
+	t.Run("array", func(t *testing.T) {
+		called := false
+		c := newCoalescer(
+			WithTypeCopier(reflect.TypeOf([2]int{}), func(v reflect.Value) (reflect.Value, error) {
+				called = true
+				return v, nil
+			}),
+		)
+		assert.NotNil(t, c.typeCopiers[reflect.TypeOf([2]int{})])
+		got, err := c.deepMerge(reflect.ValueOf([2]int{1, 2}), reflect.ValueOf([2]int{}))
+		assert.Equal(t, [2]int{1, 2}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+		called = false
+		got, err = c.deepMerge(reflect.ValueOf([2]int{}), reflect.ValueOf([2]int{1, 2}))
+		assert.Equal(t, [2]int{1, 2}, got.Interface())
+		assert.NoError(t, err)
+		assert.True(t, called)
+	})
 }
 
 func TestWithTypeMergerProvider(t *testing.T) {
@@ -185,14 +440,33 @@ func TestWithFieldMergerProvider(t *testing.T) {
 }
 
 func TestWithAtomicFieldMerge(t *testing.T) {
-	type User struct {
-		ID string
-	}
-	c := newCoalescer(WithAtomicFieldMerge(reflect.TypeOf(User{}), "ID"))
-	assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["ID"])
-	got, err := c.deepMerge(reflect.ValueOf(User{"Alice"}), reflect.ValueOf(User{"Bob"}))
-	assert.Equal(t, User{"Bob"}, got.Interface())
-	assert.NoError(t, err)
+	t.Run("struct field", func(t *testing.T) {
+		type Uuid struct {
+			Msb int64
+			Lsb int64
+		}
+		type User struct {
+			ID Uuid
+		}
+		c := newCoalescer(WithAtomicFieldMerge(reflect.TypeOf(User{}), "ID"))
+		assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["ID"])
+		got, err := c.deepMerge(reflect.ValueOf(User{ID: Uuid{Msb: 123}}), reflect.ValueOf(User{ID: Uuid{Lsb: 456}}))
+		assert.Equal(t, User{ID: Uuid{Lsb: 456}}, got.Interface())
+		assert.NoError(t, err)
+	})
+	t.Run("pointer field", func(t *testing.T) {
+		type User struct {
+			ID *int
+		}
+		c := newCoalescer(WithAtomicFieldMerge(reflect.TypeOf(User{}), "ID"))
+		assert.NotNil(t, c.fieldMergers[reflect.TypeOf(User{})]["ID"])
+		u1 := User{intPtr(1)}
+		u2 := User{intPtr(0)}
+		got, err := c.deepMerge(reflect.ValueOf(u1), reflect.ValueOf(u2))
+		assert.Equal(t, u2, got.Interface())
+		assert.NotSame(t, u2.ID, (got.Interface().(User)).ID)
+		assert.NoError(t, err)
+	})
 }
 
 func TestWithDefaultSliceListAppendMerge(t *testing.T) {

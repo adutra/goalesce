@@ -21,20 +21,20 @@ import (
 
 func (c *coalescer) deepMergePointer(v1, v2 reflect.Value) (reflect.Value, error) {
 	if value, done := checkZero(v1, v2); done {
-		return c.deepCopyPointer(value)
+		return c.deepCopy(value)
 	}
 	if c.checkCycle(v1) {
 		if c.errorOnCycle {
 			return reflect.Value{}, fmt.Errorf("%s: cycle detected", v1.Type().String())
 		}
-		return c.deepCopyPointer(v2)
+		return c.deepCopy(v2)
 	}
 	if c.checkCycle(v2) {
 		if c.errorOnCycle {
 			return reflect.Value{}, fmt.Errorf("%s: cycle detected", v2.Type().String())
 		}
 		c.unsee(v1) // because checkCycle(v1) was called
-		return c.deepCopyPointer(v1)
+		return c.deepCopy(v1)
 	}
 	mergedTarget, err := c.deepMerge(v1.Elem(), v2.Elem())
 	if err != nil {

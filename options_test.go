@@ -110,7 +110,7 @@ func TestWithAtomicMerge(t *testing.T) {
 
 func TestWithTrileanMerge(t *testing.T) {
 	c := newCoalescer(WithTrileanMerge())
-	assert.NotNil(t, c.typeMergers[reflect.PtrTo(reflect.TypeOf(false))])
+	assert.NotNil(t, c.typeMergers[reflect.PointerTo(reflect.TypeOf(false))])
 	got, err := c.deepMerge(reflect.ValueOf(boolPtr(true)), reflect.ValueOf(boolPtr(false)))
 	assert.Equal(t, boolPtr(false), got.Interface())
 	assert.NoError(t, err)

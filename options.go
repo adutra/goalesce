@@ -105,20 +105,22 @@ func WithAtomicMerge(t reflect.Type) Option {
 // "trileans", that is, a type with 3 possible values: nil (its zero-value), false and true
 // (contrary to booleans, with trileans false is NOT a zero-value).
 // The merge of trileans obeys the following rules:
-//   v1    v2    merged
-//   nil   nil   nil
-//   nil   false false
-//   nil   true  true
-//   false nil   false
-//   false false false
-//   false true  true
-//   true  nil   true
-//   true  false false
-//   true  true  true
+//
+//	v1    v2    merged
+//	nil   nil   nil
+//	nil   false false
+//	nil   true  true
+//	false nil   false
+//	false false false
+//	false true  true
+//	true  nil   true
+//	true  false false
+//	true  true  true
+//
 // The biggest difference with regular boolean pointers is that DeepMerge(&true, &false) will return
 // &true for boolean pointers, while with trileans, it will return &false.
 func WithTrileanMerge() Option {
-	return WithAtomicMerge(reflect.PtrTo(reflect.TypeOf(false)))
+	return WithAtomicMerge(reflect.PointerTo(reflect.TypeOf(false)))
 }
 
 // WithTypeMerger will defer the merge of the given type to the given custom merger. This option

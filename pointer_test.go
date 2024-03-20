@@ -349,6 +349,7 @@ func assertNotSame(t *testing.T, o1, o2 interface{}) bool {
 				return false
 			}
 		}
+	default:
 	}
 	return true
 }

@@ -81,8 +81,9 @@ func (c *coalescer) defaultDeepMerge(v1, v2 reflect.Value) (reflect.Value, error
 		return c.deepMergeSlice(v1, v2)
 	case reflect.Array:
 		return c.deepMergeArray(v1, v2)
+	default:
+		return c.deepMergeAtomic(v1, v2)
 	}
-	return c.deepMergeAtomic(v1, v2)
 }
 
 // defaultDeepCopy is the default implementation of DeepCopyFunc. It is used when the coalescer is
@@ -111,6 +112,7 @@ func (c *coalescer) defaultDeepCopy(v reflect.Value) (reflect.Value, error) {
 		return c.deepCopySlice(v)
 	case reflect.Array:
 		return c.deepCopyArray(v)
+	default:
+		return c.deepCopyAtomic(v)
 	}
-	return c.deepCopyAtomic(v)
 }

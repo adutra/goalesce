@@ -37,7 +37,10 @@ const (
 )
 
 func (c *coalescer) deepMergeStruct(v1, v2 reflect.Value) (reflect.Value, error) {
-	// don't check for zero values as we may have custom field mergers
+	// don't fallback to deepCopy if we have custom field mergers
+	if value, done := checkZero(v1, v2); done && !c.hasFieldMergers(v1.Type()) {
+		return c.deepCopy(value)
+	}
 	merged := reflect.New(v1.Type()).Elem()
 	for i := 0; i < v1.NumField(); i++ {
 		field := v1.Type().Field(i)
@@ -72,14 +75,30 @@ func (c *coalescer) deepCopyStruct(v reflect.Value) (reflect.Value, error) {
 	return copied, nil
 }
 
+func (c *coalescer) hasFieldMergers(structType reflect.Type) bool {
+	for i := 0; i < structType.NumField(); i++ {
+		field := structType.Field(i)
+		if field.IsExported() {
+			if _, foundTag := field.Tag.Lookup(MergeStrategyTag); foundTag {
+				return true
+			} else if fieldMergers, foundStruct := c.fieldMergers[structType]; foundStruct {
+				if _, foundField := fieldMergers[field.Name]; foundField {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func (c *coalescer) fieldMerger(structType reflect.Type, field reflect.StructField) (DeepMergeFunc, error) {
 	fieldMerger, err := c.fieldMergerFromTag(structType, field)
 	if err != nil {
 		return nil, err
 	}
 	if fieldMerger == nil {
-		if fieldMergers, found := c.fieldMergers[structType]; found {
-			if customFieldMerger, found := fieldMergers[field.Name]; found {
+		if fieldMergers, foundStruct := c.fieldMergers[structType]; foundStruct {
+			if customFieldMerger, foundField := fieldMergers[field.Name]; foundField {
 				fieldMerger = func(v1, v2 reflect.Value) (reflect.Value, error) {
 					merged, err := customFieldMerger(v1, v2)
 					if done, merged, err := checkCustomResult(merged, err, v1.Type()); done {

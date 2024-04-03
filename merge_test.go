@@ -389,13 +389,9 @@ func TestDeepMerge(t *testing.T) {
 	for _, tt := range trileanTests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := DeepMerge(tt.v1, tt.v2, tt.opts...)
-			if err == nil {
-				assert.Equal(t, tt.want, got)
-				assertNotSame(t, tt.v1, got)
-				assertNotSame(t, tt.v2, got)
-			} else {
-				assert.Nil(t, got)
-			}
+			assert.Equal(t, tt.want, got)
+			assertNotSame(t, tt.v1, got)
+			assertNotSame(t, tt.v2, got)
 			assert.NoError(t, err)
 		})
 	}
